@@ -549,7 +549,12 @@ if [[ "$try_now" != "n" && "$try_now" != "N" ]]; then
     else
         echo "  Connecting... (type 'exit' to leave the container)"
         echo ""
-        exec ssh -t -o StrictHostKeyChecking=no -i "${CLAUDE_KEY}" -p "${SSH_PORT}" coder@localhost \
-            "bash -l -c 'cd /workspace && exec claude'"
+        if [ "$PIPED" = true ]; then
+            exec ssh -t -o StrictHostKeyChecking=no -i "${CLAUDE_KEY}" -p "${SSH_PORT}" coder@localhost \
+                "bash -l -c 'cd /workspace && exec claude'" </dev/tty
+        else
+            exec ssh -t -o StrictHostKeyChecking=no -i "${CLAUDE_KEY}" -p "${SSH_PORT}" coder@localhost \
+                "bash -l -c 'cd /workspace && exec claude'"
+        fi
     fi
 fi
