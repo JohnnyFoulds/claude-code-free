@@ -29,12 +29,13 @@ docker run -d \
   johannesfoulds/claude-code-free
 ```
 
-Connect via SSH:
+Connect via SSH (key auth — no password needed if `SSH_AUTHORIZED_KEY` is set):
 
 ```bash
 ssh -p 2223 coder@localhost
-# password: coder
 ```
+
+Fallback password (if no key is configured): `coder`
 
 Get a free OpenRouter API key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys).
 
@@ -128,6 +129,7 @@ volumes:
 ## Injecting an SSH public key
 
 ```bash
+# Use whichever public key you have (id_ed25519, id_rsa, etc.)
 docker run -d \
   -e SSH_AUTHORIZED_KEY="$(cat ~/.ssh/id_ed25519.pub)" \
   ... \
