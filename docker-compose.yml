@@ -1,0 +1,18 @@
+services:
+  claude-code:
+    build: .
+    container_name: claude-code
+    ports:
+      - "2222:22"
+    volumes:
+      - workspace:/workspace
+    environment:
+      - ANTHROPIC_BASE_URL=https://openrouter.ai/api
+      - ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=
+      - ANTHROPIC_MODEL=stepfun/step-3.5-flash:free
+      - SSH_AUTHORIZED_KEY=${SSH_AUTHORIZED_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  workspace:
