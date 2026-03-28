@@ -205,17 +205,29 @@ if (-not $model) {
 Ok "Model: $model"
 
 # ---------------------------------------------------------------------------
-# Step 3: SSH public key (optional, silent)
+# Step 3: SSH public key — use existing or generate one silently
 # ---------------------------------------------------------------------------
+$sshDir = "$env:USERPROFILE\.ssh"
+New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
+
 $sshPubKey = ""
 $sshKeyPaths = @(
-    "$env:USERPROFILE\.ssh\id_ed25519.pub",
-    "$env:USERPROFILE\.ssh\id_rsa.pub"
+    "$sshDir\id_ed25519.pub",
+    "$sshDir\id_rsa.pub"
 )
 foreach ($keyPath in $sshKeyPaths) {
     if (Test-Path $keyPath) {
         $sshPubKey = (Get-Content $keyPath -Raw).Trim()
         break
+    }
+}
+
+if (-not $sshPubKey) {
+    Info "No SSH key found — generating one for passwordless access..."
+    ssh-keygen -t ed25519 -f "$sshDir\id_ed25519" -N "" -q 2>$null
+    if (Test-Path "$sshDir\id_ed25519.pub") {
+        $sshPubKey = (Get-Content "$sshDir\id_ed25519.pub" -Raw).Trim()
+        Ok "SSH key generated."
     }
 }
 

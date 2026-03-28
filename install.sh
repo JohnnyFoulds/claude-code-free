@@ -297,8 +297,11 @@ fi
 ok "Model: ${MODEL}"
 
 # ---------------------------------------------------------------------------
-# Step 3: SSH public key (optional, silent)
+# Step 3: SSH public key — use existing or generate one silently
 # ---------------------------------------------------------------------------
+mkdir -p "${HOME}/.ssh"
+chmod 700 "${HOME}/.ssh"
+
 SSH_PUB_KEY=""
 for key_file in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
     if [ -f "$key_file" ]; then
@@ -306,6 +309,13 @@ for key_file in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
         break
     fi
 done
+
+if [ -z "$SSH_PUB_KEY" ]; then
+    info "No SSH key found — generating one for passwordless access..."
+    ssh-keygen -t ed25519 -f "${HOME}/.ssh/id_ed25519" -N "" -q
+    SSH_PUB_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
+    ok "SSH key generated."
+fi
 
 # ---------------------------------------------------------------------------
 # Step 4: Workspace location
