@@ -9,10 +9,10 @@
 
 set -euo pipefail
 
-# When piped (curl | bash), stdin is the script — reopen from /dev/tty immediately
-# so all interactive prompts (read) receive terminal input for the rest of the script.
+# When piped (curl | bash), stdin is the script — reopen from /dev/tty so that
+# interactive prompts work. The || true prevents set -e from aborting if unavailable.
 if [ ! -t 0 ]; then
-    exec < /dev/tty
+    exec < /dev/tty || true
 fi
 
 GITHUB_RAW="https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
@@ -42,7 +42,7 @@ fi
 # ---------------------------------------------------------------------------
 # Welcome
 # ---------------------------------------------------------------------------
-clear
+clear 2>/dev/null || true
 echo ""
 echo -e "${CYAN}  Claude Code — Free AI Coding Assistant${NC}"
 echo -e "  Powered by Step-3.5-Flash via OpenRouter (free tier)"
