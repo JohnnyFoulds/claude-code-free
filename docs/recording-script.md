@@ -266,3 +266,104 @@ clear
 ```
 
 Then start again from **The recording** section. The container image is already cached so the pull step will be instant on the second take.
+
+---
+
+## Better approach: fully scripted recording with expect
+
+The manual approach above relies on a human typing without mistakes, at consistent speed, responding to prompts at the right moment. One typo or hesitation ruins the take.
+
+The better approach is to script the entire session using `expect` — a tool designed to drive interactive terminal programs automatically. The `expect` script plays the role of the human: it types each character at a controlled speed, waits for specific output before continuing, and responds to every prompt automatically. The result is a perfectly repeatable, mistake-free recording every time.
+
+### How it works
+
+```text
+asciinema rec  →  runs a shell  →  expect script drives that shell
+                                    ├── types curl command (char by char, human speed)
+                                    ├── waits for "Press Enter" prompt → sends Enter
+                                    ├── waits for "API key" prompt → sends key
+                                    ├── waits for model/workspace prompts → sends defaults
+                                    ├── waits for SSH to connect
+                                    ├── waits for Claude Code header
+                                    ├── types the demo prompt (char by char, slow)
+                                    ├── waits for Claude to finish responding
+                                    └── types exit
+```
+
+`asciinema` captures every character and its exact timing. The SVG plays back exactly what `expect` produced — indistinguishable from a human typing it live.
+
+### What you need to decide before writing the script
+
+**1. The demo prompt** — what Claude is asked to do. Needs to:
+
+- Produce visually rich streaming output (20-40 lines)
+- Complete in under 30 seconds (viewer attention)
+- Show something a developer immediately recognises as useful
+
+Current best candidate:
+
+```text
+write a python function that reads a csv file and returns the top 5
+rows sorted by a given column. include type hints and a docstring.
+```
+
+**2. The OpenRouter API key** — the script needs a real key to get a real Claude response. Options:
+
+- Hard-code it in the script (keep the script out of git, or use a throwaway key)
+- Pass it as an environment variable: `OPENROUTER_KEY=sk-or-v1-... bash record.sh`
+
+**3. Typing speeds** — tunable constants at the top of the script:
+
+- `CHAR_DELAY` — milliseconds between each character (default: 80ms, human typing ~12 chars/sec)
+- `PROMPT_PAUSE` — seconds to pause before responding to a prompt (default: 1.0s, looks natural)
+- `POST_RESPONSE_PAUSE` — seconds to wait after Claude finishes before typing exit (default: 2.0s)
+
+### Tools required
+
+```bash
+brew install expect asciinema
+npm install -g svg-term-cli
+```
+
+### The two scripts
+
+The implementation is split into two files:
+
+**`docs/record.exp`** — the `expect` script that drives the session. Contains all the
+prompts to wait for, all the responses to send, and the typing speed logic. This is the
+file you edit to change what gets typed or how fast.
+
+**`docs/record.sh`** — a thin shell wrapper that:
+
+1. Resets the environment to a clean state
+2. Sets terminal dimensions (110×30)
+3. Launches `asciinema rec` with `record.exp` as the command
+4. Converts the resulting `.cast` file to SVG via `svg-term`
+5. Opens the SVG in the browser for review
+
+To produce a new recording:
+
+```bash
+OPENROUTER_KEY=sk-or-v1-your-key-here bash docs/record.sh
+```
+
+That is the entire workflow. One command, clean take every time.
+
+### Re-recording after a script change
+
+Because the session is fully scripted, you can iterate on what Claude is asked, how fast
+things type, or what prompts are used — then re-record instantly with the same command.
+No human involvement required between takes.
+
+### Status
+
+**Not yet implemented.** The `record.exp` and `record.sh` scripts need to be written.
+All design decisions above need to be confirmed before writing them:
+
+- [ ] Confirm demo prompt
+- [ ] Confirm API key handling approach (env var recommended)
+- [ ] Confirm desired total animation length (target: 60-90 seconds)
+- [ ] Write `docs/record.exp`
+- [ ] Write `docs/record.sh`
+- [ ] Test full pipeline: record → convert → review SVG
+- [ ] Add `docs/demo.svg` to README
