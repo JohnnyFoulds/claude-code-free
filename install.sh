@@ -434,9 +434,11 @@ mkdir -p "${HOME}/.ssh"
 SSH_CONFIG="${HOME}/.ssh/config"
 
 if grep -q "Host ${SSH_CONFIG_HOST}" "${SSH_CONFIG}" 2>/dev/null; then
-    ok "SSH config entry already exists."
-else
-    cat >> "${SSH_CONFIG}" <<EOF
+    # Remove existing block and replace with updated entry
+    perl -i -0pe "s/\n?Host ${SSH_CONFIG_HOST}\b.*?(?=\nHost |\z)//s" "${SSH_CONFIG}" 2>/dev/null || \
+        sed -i "/^Host ${SSH_CONFIG_HOST}/,/^Host /{ /^Host ${SSH_CONFIG_HOST}/d; /^Host /!d; }" "${SSH_CONFIG}"
+fi
+cat >> "${SSH_CONFIG}" <<EOF
 
 Host ${SSH_CONFIG_HOST}
     HostName localhost
@@ -445,8 +447,7 @@ Host ${SSH_CONFIG_HOST}
     IdentityFile ${CLAUDE_KEY}
     StrictHostKeyChecking no
 EOF
-    ok "SSH config entry added."
-fi
+ok "SSH config entry updated."
 
 # ---------------------------------------------------------------------------
 # Done

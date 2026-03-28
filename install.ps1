@@ -353,7 +353,10 @@ Host $SSH_CONFIG_HOST
 if (Test-Path $sshConfig) {
     $existing = Get-Content $sshConfig -Raw
     if ($existing -match "Host $SSH_CONFIG_HOST") {
-        Ok "SSH config entry already exists."
+        # Remove the existing block and replace it with the updated entry
+        $updated = $existing -replace "(?ms)(\r?\n)?Host $SSH_CONFIG_HOST\b.*?(?=\r?\nHost |\z)", ""
+        Set-Content -Path $sshConfig -Value ($updated.TrimEnd() + $entry)
+        Ok "SSH config entry updated."
     } else {
         Add-Content -Path $sshConfig -Value $entry
         Ok "SSH config entry added."
