@@ -42,40 +42,182 @@ echo -e "${CYAN}  Claude Code — Free AI Coding Assistant${NC}"
 echo -e "  Powered by Step-3.5-Flash via OpenRouter (free tier)"
 echo ""
 echo "  This script will:"
-echo "    1. Check that Docker Desktop is running"
+echo "    1. Install Docker if needed, or start it if not running"
 echo "    2. Ask for your free OpenRouter API key (if not provided)"
 echo "    3. Download and start the Claude Code container"
 echo "    4. Configure VS Code Remote SSH"
 echo ""
-echo "  Takes about 5 minutes on first run."
+echo "  Takes about 2-5 minutes on first run."
 echo ""
-# Skip prompt if running via pipe (non-interactive)
+# Skip prompt if running non-interactively (piped)
 if [ -t 0 ]; then
     read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
 fi
 
 # ---------------------------------------------------------------------------
+# Detect OS
+# ---------------------------------------------------------------------------
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+# ---------------------------------------------------------------------------
 # Step 1: Docker
 # ---------------------------------------------------------------------------
-heading "Step 1: Docker Desktop"
+heading "Step 1: Docker"
 
+install_docker_mac() {
+    info "Docker Desktop is not installed. Installing now..."
+    echo ""
+
+    # Check for Homebrew first — easiest path
+    if command -v brew &> /dev/null; then
+        info "Installing Docker Desktop via Homebrew..."
+        brew install --cask docker
+        ok "Docker Desktop installed."
+    else
+        # Download the right DMG for the architecture
+        if [ "$ARCH" = "arm64" ]; then
+            DMG_URL="https://desktop.docker.com/mac/main/arm64/Docker.dmg"
+        else
+            DMG_URL="https://desktop.docker.com/mac/main/amd64/Docker.dmg"
+        fi
+        info "Downloading Docker Desktop (~600 MB)..."
+        curl -L "$DMG_URL" -o /tmp/Docker.dmg
+        info "Mounting installer..."
+        hdiutil attach /tmp/Docker.dmg -quiet
+        info "Installing Docker Desktop (you may be prompted for your password)..."
+        sudo cp -R "/Volumes/Docker/Docker.app" /Applications/
+        hdiutil detach "/Volumes/Docker" -quiet
+        rm /tmp/Docker.dmg
+        ok "Docker Desktop installed to /Applications/Docker.app"
+    fi
+
+    info "Starting Docker Desktop..."
+    open -a Docker
+    echo ""
+    warn "Docker Desktop is starting up — this takes about 30 seconds on first launch."
+    echo "  Waiting for Docker to be ready..."
+    local elapsed=0
+    while ! docker info &> /dev/null; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        if [ $elapsed -ge 120 ]; then
+            error "Docker did not start within 2 minutes."
+            echo "  Please open Docker Desktop manually and re-run this script."
+            exit 1
+        fi
+        echo -n "."
+    done
+    echo ""
+}
+
+install_docker_linux() {
+    info "Docker is not installed. Installing Docker Engine..."
+    echo ""
+
+    # Detect distro
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO="$ID"
+    else
+        DISTRO="unknown"
+    fi
+
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint|pop)
+            info "Installing Docker Engine via apt (requires sudo)..."
+            sudo apt-get update -qq
+            sudo apt-get install -y ca-certificates curl gnupg
+            sudo install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+                | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            sudo chmod a+r /etc/apt/keyrings/docker.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+                https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+                | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+            sudo usermod -aG docker "$USER"
+            sudo systemctl enable --now docker
+            ok "Docker Engine installed."
+            warn "You have been added to the 'docker' group."
+            warn "You may need to log out and back in for group changes to take effect."
+            warn "If docker commands fail, run: newgrp docker"
+            ;;
+        fedora|rhel|centos|rocky|alma)
+            info "Installing Docker Engine via dnf (requires sudo)..."
+            sudo dnf -y install dnf-plugins-core
+            sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+            sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+            sudo usermod -aG docker "$USER"
+            sudo systemctl enable --now docker
+            ok "Docker Engine installed."
+            warn "You may need to log out and back in, or run: newgrp docker"
+            ;;
+        *)
+            error "Unsupported Linux distribution: $DISTRO"
+            echo ""
+            echo "  Please install Docker manually: https://docs.docker.com/engine/install/"
+            echo "  Then re-run this script."
+            exit 1
+            ;;
+    esac
+}
+
+start_docker_mac() {
+    warn "Docker Desktop is installed but not running."
+    info "Starting Docker Desktop..."
+    open -a Docker
+    echo ""
+    echo "  Waiting for Docker to be ready..."
+    local elapsed=0
+    while ! docker info &> /dev/null; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        if [ $elapsed -ge 120 ]; then
+            error "Docker did not start within 2 minutes."
+            echo "  Please open Docker Desktop manually and re-run this script."
+            exit 1
+        fi
+        echo -n "."
+    done
+    echo ""
+}
+
+# Main Docker check
 if ! command -v docker &> /dev/null; then
-    error "Docker is not installed."
-    echo ""
-    echo "  Install Docker Desktop from: https://www.docker.com/products/docker-desktop/"
-    echo "  Then re-run this script."
-    exit 1
+    # Not installed at all
+    case "$OS" in
+        Darwin) install_docker_mac ;;
+        Linux)  install_docker_linux ;;
+        *)
+            error "Unsupported OS: $OS"
+            echo "  Please install Docker manually: https://www.docker.com/products/docker-desktop/"
+            exit 1
+            ;;
+    esac
 fi
 
+# Installed but not running
 if ! docker info &> /dev/null; then
-    error "Docker Desktop is not running."
-    echo ""
-    echo "  Please start Docker Desktop and wait for it to fully load,"
-    echo "  then re-run this script."
+    case "$OS" in
+        Darwin) start_docker_mac ;;
+        Linux)
+            info "Starting Docker daemon (requires sudo)..."
+            sudo systemctl start docker
+            sleep 3
+            ;;
+    esac
+fi
+
+# Final check
+if ! docker info &> /dev/null; then
+    error "Docker is still not running."
+    echo "  Please start Docker Desktop manually and re-run this script."
     exit 1
 fi
 
-ok "Docker Desktop is running ($(docker --version | cut -d' ' -f3 | tr -d ','))"
+ok "Docker is ready ($(docker --version | cut -d' ' -f3 | tr -d ','))"
 
 # ---------------------------------------------------------------------------
 # Step 2: OpenRouter API key
@@ -145,7 +287,7 @@ if docker ps -aq --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
 fi
 
 info "Pulling and starting Claude Code container..."
-info "(First run downloads ~1 GB — should take about a minute on a good connection)"
+info "(First run downloads ~1 GB — takes about 1-2 minutes)"
 echo ""
 docker compose --env-file "${INSTALL_DIR}/.env" -f "${INSTALL_DIR}/docker-compose.yml" up -d --pull always
 echo ""
@@ -182,7 +324,7 @@ echo "  Claude Code is running and ready."
 echo ""
 echo "  Connect from VS Code:"
 echo "    1. Install the 'Remote - SSH' extension (if not already installed)"
-echo "    2. Press Cmd+Shift+P (Mac) or Ctrl+Shift+P (Windows/Linux)"
+echo "    2. Press Cmd+Shift+P (Mac) or Ctrl+Shift+P (Linux)"
 echo "    3. Type:   Remote-SSH: Connect to Host"
 echo "    4. Select: ${SSH_CONFIG_HOST}"
 if [ -z "$SSH_PUB_KEY" ]; then

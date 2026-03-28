@@ -9,9 +9,9 @@
 
 $ErrorActionPreference = "Stop"
 
-$GITHUB_RAW   = "https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
-$INSTALL_DIR  = "$env:USERPROFILE\.claude-code-free"
-$SSH_PORT     = 2223
+$GITHUB_RAW      = "https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
+$INSTALL_DIR     = "$env:USERPROFILE\.claude-code-free"
+$SSH_PORT        = 2223
 $SSH_CONFIG_HOST = "claude-code-free"
 
 # ---------------------------------------------------------------------------
@@ -20,12 +20,34 @@ $SSH_CONFIG_HOST = "claude-code-free"
 function Info    { param($msg) Write-Host "  [*] $msg" -ForegroundColor Cyan }
 function Ok      { param($msg) Write-Host "  [+] $msg" -ForegroundColor Green }
 function Warn    { param($msg) Write-Host "  [!] $msg" -ForegroundColor Yellow }
+function Err     { param($msg) Write-Host "  [x] $msg" -ForegroundColor Red }
 function Heading { param($msg) Write-Host "`n--- $msg ---`n" -ForegroundColor Cyan }
 
 function Download {
     param($file)
     Info "Downloading $file..."
     Invoke-WebRequest -Uri "$GITHUB_RAW/$file" -OutFile "$INSTALL_DIR\$file" -UseBasicParsing
+}
+
+function WaitForDocker {
+    Info "Waiting for Docker to be ready..."
+    $elapsed = 0
+    while ($true) {
+        try {
+            docker info 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { break }
+        } catch {}
+        Start-Sleep -Seconds 3
+        $elapsed += 3
+        Write-Host -NoNewline "."
+        if ($elapsed -ge 120) {
+            Write-Host ""
+            Err "Docker did not start within 2 minutes."
+            Write-Host "  Please open Docker Desktop manually and re-run this script."
+            exit 1
+        }
+    }
+    Write-Host ""
 }
 
 # ---------------------------------------------------------------------------
@@ -37,12 +59,12 @@ Write-Host "  Claude Code - Free AI Coding Assistant" -ForegroundColor Cyan
 Write-Host "  Powered by Step-3.5-Flash via OpenRouter (free tier)"
 Write-Host ""
 Write-Host "  This script will:"
-Write-Host "    1. Check that Docker Desktop is running"
+Write-Host "    1. Install Docker Desktop if needed, or start it if not running"
 Write-Host "    2. Ask for your free OpenRouter API key (if not provided)"
 Write-Host "    3. Download and start the Claude Code container"
 Write-Host "    4. Configure VS Code Remote SSH"
 Write-Host ""
-Write-Host "  Takes about 5 minutes on first run."
+Write-Host "  Takes about 2-5 minutes on first run."
 Write-Host ""
 Read-Host "  Press Enter to continue, or Ctrl-C to cancel"
 
@@ -51,29 +73,73 @@ Read-Host "  Press Enter to continue, or Ctrl-C to cancel"
 # ---------------------------------------------------------------------------
 Heading "Step 1: Docker Desktop"
 
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+$dockerInstalled = $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
+
+if (-not $dockerInstalled) {
+    Warn "Docker Desktop is not installed."
     Write-Host ""
-    Write-Host "  Docker is not installed." -ForegroundColor Red
-    Write-Host ""
-    Write-Host "  Install Docker Desktop from: https://www.docker.com/products/docker-desktop/"
-    Write-Host "  Then re-run this script."
-    exit 1
+    Info "Downloading Docker Desktop installer..."
+
+    $arch = (Get-WmiObject Win32_OperatingSystem).OSArchitecture
+    if ($arch -match "ARM") {
+        $dockerUrl = "https://desktop.docker.com/win/main/arm64/Docker%20Desktop%20Installer.exe"
+    } else {
+        $dockerUrl = "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe"
+    }
+
+    $installerPath = "$env:TEMP\DockerDesktopInstaller.exe"
+    Invoke-WebRequest -Uri $dockerUrl -OutFile $installerPath -UseBasicParsing
+    Info "Running Docker Desktop installer (you may see a UAC prompt — click Yes)..."
+    Start-Process -FilePath $installerPath -ArgumentList "install", "--quiet", "--accept-license" -Wait
+    Remove-Item $installerPath -Force
+
+    Ok "Docker Desktop installed."
+    Info "Starting Docker Desktop..."
+    Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    WaitForDocker
+
+} else {
+    # Installed — check if running
+    $isRunning = $false
+    try {
+        docker info 2>&1 | Out-Null
+        $isRunning = ($LASTEXITCODE -eq 0)
+    } catch {}
+
+    if (-not $isRunning) {
+        Warn "Docker Desktop is installed but not running."
+        Info "Starting Docker Desktop..."
+
+        $dockerExe = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+        if (Test-Path $dockerExe) {
+            Start-Process $dockerExe
+        } else {
+            # Try finding it
+            $found = Get-ChildItem "C:\Program Files\Docker" -Recurse -Filter "Docker Desktop.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) {
+                Start-Process $found.FullName
+            } else {
+                Err "Could not find Docker Desktop executable."
+                Write-Host "  Please start Docker Desktop manually and re-run this script."
+                exit 1
+            }
+        }
+        WaitForDocker
+    }
 }
 
+# Final check
 try {
     docker info 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw }
 } catch {
-    Write-Host ""
-    Write-Host "  Docker Desktop is not running." -ForegroundColor Red
-    Write-Host ""
-    Write-Host "  Please start Docker Desktop and wait for it to fully load,"
-    Write-Host "  then re-run this script."
+    Err "Docker is still not running."
+    Write-Host "  Please start Docker Desktop manually and re-run this script."
     exit 1
 }
 
 $dockerVersion = (docker --version) -replace "Docker version ([0-9.]+).*", '$1'
-Ok "Docker Desktop is running ($dockerVersion)"
+Ok "Docker is ready ($dockerVersion)"
 
 # ---------------------------------------------------------------------------
 # Step 2: OpenRouter API key
@@ -115,8 +181,7 @@ $sshKeyPaths = @(
 )
 foreach ($keyPath in $sshKeyPaths) {
     if (Test-Path $keyPath) {
-        $sshPubKey = Get-Content $keyPath -Raw
-        $sshPubKey = $sshPubKey.Trim()
+        $sshPubKey = (Get-Content $keyPath -Raw).Trim()
         break
     }
 }
@@ -127,9 +192,7 @@ foreach ($keyPath in $sshKeyPaths) {
 Heading "Step 4: Downloading configuration"
 
 New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
-
 Download "docker-compose.yml"
-
 Ok "Configuration downloaded to $INSTALL_DIR"
 
 # ---------------------------------------------------------------------------
@@ -148,7 +211,7 @@ if ($existing) {
 }
 
 Info "Pulling and starting Claude Code container..."
-Info "(First run downloads ~1 GB — should take about a minute on a good connection)"
+Info "(First run downloads ~1 GB — takes about 1-2 minutes)"
 Write-Host ""
 docker compose --env-file "$INSTALL_DIR\.env" -f "$INSTALL_DIR\docker-compose.yml" up -d --pull always
 Write-Host ""
@@ -161,7 +224,6 @@ Heading "Step 6: VS Code SSH config"
 
 $sshDir    = "$env:USERPROFILE\.ssh"
 $sshConfig = "$sshDir\config"
-
 New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
 
 $entry = @"
