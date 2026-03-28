@@ -127,10 +127,12 @@ Claude Code is built to work with any OpenAI-compatible API. This project points
 
 | Component | Version |
 |-----------|---------|
-| OS | Ubuntu 24.04 |
+| OS | Debian 12 (slim) |
 | Claude Code | latest |
 | Node.js | 22 LTS |
-| Miniconda | latest |
+| Python | 3 (system) |
+
+> If you need conda environments, run `curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh | bash` inside the container to install Miniconda into `/workspace`.
 
 ## Known limitations
 
