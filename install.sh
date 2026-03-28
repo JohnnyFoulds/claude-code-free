@@ -333,17 +333,27 @@ fi
 ok "Model: ${MODEL}"
 
 # ---------------------------------------------------------------------------
-# Step 3: SSH public key — use dedicated passwordless key for claude-code-free
+# Step 3: SSH public key
 # ---------------------------------------------------------------------------
 mkdir -p "${HOME}/.ssh"
 chmod 700 "${HOME}/.ssh"
 
-# Always use a dedicated key so we never rely on a user key that may have a passphrase.
-CLAUDE_KEY="${HOME}/.ssh/id_ed25519_claude_code_free"
-if [ ! -f "${CLAUDE_KEY}.pub" ]; then
-    ssh-keygen -t ed25519 -f "$CLAUDE_KEY" -N "" -q
+# Use the first existing key, or generate a standard id_ed25519 if none exists.
+SSH_PUB_KEY=""
+for _pub in "${HOME}/.ssh/id_ed25519.pub" "${HOME}/.ssh/id_ecdsa.pub" "${HOME}/.ssh/id_rsa.pub"; do
+    if [ -f "$_pub" ]; then
+        SSH_PUB_KEY=$(cat "$_pub")
+        ok "Using existing SSH key: $_pub"
+        break
+    fi
+done
+
+if [ -z "$SSH_PUB_KEY" ]; then
+    info "No SSH key found — generating ~/.ssh/id_ed25519..."
+    ssh-keygen -t ed25519 -f "${HOME}/.ssh/id_ed25519" -N "" -q
+    SSH_PUB_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
+    ok "SSH key generated."
 fi
-SSH_PUB_KEY=$(cat "${CLAUDE_KEY}.pub")
 
 # ---------------------------------------------------------------------------
 # Step 4: Workspace location
@@ -492,7 +502,6 @@ Host ${SSH_CONFIG_HOST}
     HostName localhost
     Port ${SSH_PORT}
     User coder
-    IdentityFile ${CLAUDE_KEY}
     StrictHostKeyChecking no
 EOF
 ok "SSH config entry updated."
@@ -510,20 +519,17 @@ echo "    ${WORKSPACE_DISPLAY}"
 echo "  Inside the container this is /workspace."
 echo ""
 echo "  ── SSH access ──────────────────────────────────────────────────"
-echo "  Direct SSH:"
+echo "  Direct SSH (key auth — no password needed):"
 echo "    ssh -p ${SSH_PORT} coder@localhost"
-if [ -z "$SSH_PUB_KEY" ]; then
-    echo "    Password: coder"
-fi
+echo "  Or using the config entry:"
+echo "    ssh ${SSH_CONFIG_HOST}"
+echo "  Fallback password (if key not accepted): coder"
 echo ""
 echo "  ── VS Code Remote SSH ──────────────────────────────────────────"
 echo "  1. Install the 'Remote - SSH' extension (if not already installed)"
 echo "  2. Press Cmd+Shift+P (Mac) or Ctrl+Shift+P (Linux)"
 echo "  3. Type:   Remote-SSH: Connect to Host"
 echo "  4. Select: ${SSH_CONFIG_HOST}"
-if [ -z "$SSH_PUB_KEY" ]; then
-    echo "  5. Password: coder"
-fi
 echo ""
 echo "  ── Once inside the container ───────────────────────────────────"
 echo "    cd /workspace"
@@ -557,10 +563,10 @@ if [[ "$try_now" != "n" && "$try_now" != "N" ]]; then
         echo "  Connecting... (type 'exit' to leave the container)"
         echo ""
         if [ "$PIPED" = true ]; then
-            exec ssh -t -o StrictHostKeyChecking=no -i "${CLAUDE_KEY}" -p "${SSH_PORT}" coder@localhost \
+            exec ssh -t -o StrictHostKeyChecking=no -p "${SSH_PORT}" coder@localhost \
                 "bash -l -c 'cd /workspace && exec claude'" </dev/tty
         else
-            exec ssh -t -o StrictHostKeyChecking=no -i "${CLAUDE_KEY}" -p "${SSH_PORT}" coder@localhost \
+            exec ssh -t -o StrictHostKeyChecking=no -p "${SSH_PORT}" coder@localhost \
                 "bash -l -c 'cd /workspace && exec claude'"
         fi
     fi

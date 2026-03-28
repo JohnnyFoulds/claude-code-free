@@ -205,17 +205,28 @@ if (-not $model) {
 Ok "Model: $model"
 
 # ---------------------------------------------------------------------------
-# Step 3: SSH public key — use dedicated passwordless key for claude-code-free
+# Step 3: SSH public key
 # ---------------------------------------------------------------------------
 $sshDir = "$env:USERPROFILE\.ssh"
 New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
 
-# Always use a dedicated key so we never rely on a user key that may have a passphrase.
-$claudeKeyPath = "$sshDir\id_ed25519_claude_code_free"
-if (-not (Test-Path "$claudeKeyPath.pub")) {
-    ssh-keygen -t ed25519 -f $claudeKeyPath -N '""' 2>&1 | Out-Null
+# Use the first existing key, or generate a standard id_ed25519 if none exists.
+$sshPubKey = ""
+foreach ($keyName in @("id_ed25519", "id_ecdsa", "id_rsa")) {
+    $pubPath = "$sshDir\$keyName.pub"
+    if (Test-Path $pubPath) {
+        $sshPubKey = (Get-Content $pubPath -Raw).Trim()
+        Ok "Using existing SSH key: $pubPath"
+        break
+    }
 }
-$sshPubKey = (Get-Content "$claudeKeyPath.pub" -Raw).Trim()
+
+if (-not $sshPubKey) {
+    Info "No SSH key found — generating $sshDir\id_ed25519..."
+    ssh-keygen -t ed25519 -f "$sshDir\id_ed25519" -N '""' 2>&1 | Out-Null
+    $sshPubKey = (Get-Content "$sshDir\id_ed25519.pub" -Raw).Trim()
+    Ok "SSH key generated."
+}
 
 # ---------------------------------------------------------------------------
 # Step 4: Workspace location
@@ -346,7 +357,6 @@ Host $SSH_CONFIG_HOST
     HostName localhost
     Port $SSH_PORT
     User coder
-    IdentityFile $claudeKeyPath
     StrictHostKeyChecking no
 "@
 
@@ -379,20 +389,17 @@ Write-Host "    $workspaceDisplay"
 Write-Host "  Inside the container this is /workspace."
 Write-Host ""
 Write-Host "  ── SSH access ──────────────────────────────────────────────────"
-Write-Host "  Direct SSH:"
+Write-Host "  Direct SSH (key auth — no password needed):"
 Write-Host "    ssh -p $SSH_PORT coder@localhost"
-if (-not $sshPubKey) {
-    Write-Host "    Password: coder"
-}
+Write-Host "  Or using the config entry:"
+Write-Host "    ssh $SSH_CONFIG_HOST"
+Write-Host "  Fallback password (if key not accepted): coder"
 Write-Host ""
 Write-Host "  ── VS Code Remote SSH ──────────────────────────────────────────"
 Write-Host "  1. Install the 'Remote - SSH' extension (if not already installed)"
 Write-Host "  2. Press Ctrl+Shift+P"
 Write-Host "  3. Type:   Remote-SSH: Connect to Host"
 Write-Host "  4. Select: $SSH_CONFIG_HOST"
-if (-not $sshPubKey) {
-    Write-Host "  5. Password: coder"
-}
 Write-Host ""
 Write-Host "  ── Once inside the container ───────────────────────────────────"
 Write-Host "    cd /workspace"
@@ -424,6 +431,6 @@ if ($tryNow -notmatch "^[Nn]") {
     } else {
         Write-Host "  Connecting... (type 'exit' to leave the container)"
         Write-Host ""
-        ssh -t -o StrictHostKeyChecking=no -i $claudeKeyPath -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
+        ssh -t -o StrictHostKeyChecking=no -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
     }
 }
