@@ -213,7 +213,8 @@ New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
 # Always use a dedicated key so we never rely on a user key that may have a passphrase.
 $claudeKeyPath = "$sshDir\id_ed25519_claude_code_free"
 if (-not (Test-Path "$claudeKeyPath.pub")) {
-    ssh-keygen -t ed25519 -f $claudeKeyPath -N "" -q 2>$null
+    $sshKeygenInput = "`n`n"
+    $sshKeygenInput | ssh-keygen -t ed25519 -f $claudeKeyPath -q 2>&1 | Out-Null
 }
 $sshPubKey = (Get-Content "$claudeKeyPath.pub" -Raw).Trim()
 
