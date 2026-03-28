@@ -60,7 +60,7 @@ Write-Host "  Powered by Step-3.5-Flash via OpenRouter (free tier)"
 Write-Host ""
 Write-Host "  This script will:"
 Write-Host "    1. Install Docker Desktop if needed, or start it if not running"
-Write-Host "    2. Ask for your free OpenRouter API key (if not provided)"
+Write-Host "    2. Ask for your free OpenRouter API key"
 Write-Host "    3. Download and start the Claude Code container"
 Write-Host "    4. Configure VS Code Remote SSH"
 Write-Host ""
@@ -77,6 +77,14 @@ $dockerInstalled = $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
 
 if (-not $dockerInstalled) {
     Warn "Docker Desktop is not installed."
+    Write-Host ""
+    $answer = Read-Host "  Install Docker Desktop now? [Y/n]"
+    if ($answer -match "^[Nn]") {
+        Write-Host ""
+        Write-Host "  Install it from: https://www.docker.com/products/docker-desktop/"
+        Write-Host "  Then re-run this script."
+        exit 0
+    }
     Write-Host ""
     Info "Downloading Docker Desktop installer..."
 
@@ -108,6 +116,11 @@ if (-not $dockerInstalled) {
 
     if (-not $isRunning) {
         Warn "Docker Desktop is installed but not running."
+        $answer = Read-Host "  Start Docker Desktop now? [Y/n]"
+        if ($answer -match "^[Nn]") {
+            Write-Host "  Please start Docker Desktop manually and re-run this script."
+            exit 0
+        }
         Info "Starting Docker Desktop..."
 
         $dockerExe = "C:\Program Files\Docker\Docker\Docker Desktop.exe"

@@ -43,7 +43,7 @@ echo -e "  Powered by Step-3.5-Flash via OpenRouter (free tier)"
 echo ""
 echo "  This script will:"
 echo "    1. Install Docker if needed, or start it if not running"
-echo "    2. Ask for your free OpenRouter API key (if not provided)"
+echo "    2. Ask for your free OpenRouter API key"
 echo "    3. Download and start the Claude Code container"
 echo "    4. Configure VS Code Remote SSH"
 echo ""
@@ -66,7 +66,15 @@ ARCH="$(uname -m)"
 heading "Step 1: Docker"
 
 install_docker_mac() {
-    info "Docker Desktop is not installed. Installing now..."
+    warn "Docker Desktop is not installed."
+    echo ""
+    read -r -p "  Install Docker Desktop now? [Y/n] " answer
+    if [[ "${answer,,}" == "n" ]]; then
+        echo ""
+        echo "  Install it from: https://www.docker.com/products/docker-desktop/"
+        echo "  Then re-run this script."
+        exit 0
+    fi
     echo ""
 
     # Check for Homebrew first — easiest path
@@ -112,7 +120,15 @@ install_docker_mac() {
 }
 
 install_docker_linux() {
-    info "Docker is not installed. Installing Docker Engine..."
+    warn "Docker is not installed."
+    echo ""
+    read -r -p "  Install Docker Engine now? (requires sudo) [Y/n] " answer
+    if [[ "${answer,,}" == "n" ]]; then
+        echo ""
+        echo "  Install it from: https://docs.docker.com/engine/install/"
+        echo "  Then re-run this script."
+        exit 0
+    fi
     echo ""
 
     # Detect distro
@@ -166,6 +182,12 @@ install_docker_linux() {
 
 start_docker_mac() {
     warn "Docker Desktop is installed but not running."
+    read -r -p "  Start Docker Desktop now? [Y/n] " answer
+    if [[ "${answer,,}" == "n" ]]; then
+        echo ""
+        echo "  Please start Docker Desktop manually and re-run this script."
+        exit 0
+    fi
     info "Starting Docker Desktop..."
     open -a Docker
     echo ""
@@ -203,7 +225,12 @@ if ! docker info &> /dev/null; then
     case "$OS" in
         Darwin) start_docker_mac ;;
         Linux)
-            info "Starting Docker daemon (requires sudo)..."
+            warn "Docker is installed but not running."
+            read -r -p "  Start Docker daemon now? (requires sudo) [Y/n] " answer
+            if [[ "${answer,,}" == "n" ]]; then
+                echo "  Please start Docker manually and re-run this script."
+                exit 0
+            fi
             sudo systemctl start docker
             sleep 3
             ;;
