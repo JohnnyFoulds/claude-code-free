@@ -80,19 +80,19 @@ docker compose --env-file ~/.claude-code-free/.env -f ~/.claude-code-free/docker
 
 ### Models worth trying
 
-| Model | Size | Context | Notes |
-| --- | --- | --- | --- |
-| `stepfun/step-3.5-flash:free` | 196B MoE | 256K | Default — fast, well-rounded |
-| `qwen/qwen3-coder:free` | 480B MoE | 262K | Strong at code generation and agentic tasks |
-| `openai/gpt-oss-120b:free` | 120B MoE | 131K | Strong reasoning |
-| `openai/gpt-oss-20b:free` | 21B MoE | 131K | Faster, lighter |
-| `nvidia/nemotron-3-super-120b-a12b:free` | 120B MoE | 262K | Complex reasoning |
-| `meta-llama/llama-3.3-70b-instruct:free` | 70B | 65K | Solid all-rounder |
-| `mistralai/mistral-small-3.1-24b-instruct:free` | 24B | 128K | Fast, multimodal |
-| `google/gemma-3-27b-it:free` | 27B | 131K | Google Gemma 3 |
-| `nousresearch/hermes-3-llama-3.1-405b:free` | 405B | 131K | Large, agentic tasks |
+The default model is chosen for rate-limit headroom, not peak quality. For the best coding results with occasional use, try `qwen/qwen3-coder:free`. For private code, avoid the gpt-oss and gemma free tiers — their providers train on your prompts.
 
-Full list at [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free). Different models have different strengths — it is worth trying a few to find what works best for your workflow.
+| Model | Context | Req/min | Notes |
+| --- | --- | --- | --- |
+| `stepfun/step-3.5-flash:free` | 256K | **50** | **Default** — best availability; SWE-bench 74% |
+| `qwen/qwen3-coder:free` | 262K | 8 | Best coding quality; privacy-safe (Venice) |
+| `openai/gpt-oss-120b:free` | 131K | — | ⚠ Free provider trains on your prompts |
+| `openai/gpt-oss-20b:free` | 131K | — | ⚠ Free provider trains on your prompts |
+| `nvidia/nemotron-3-super-120b-a12b:free` | 262K | — | ⚠ NVIDIA logs all prompts (trial use only) |
+| `meta-llama/llama-3.3-70b-instruct:free` | 65K | 8 | Simple tasks; context halved on free tier |
+| `google/gemma-3-27b-it:free` | 131K | — | ⚠ No tool use on free tier — incompatible with Claude Code |
+
+Full list at [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free). See the [model guide](docs/model-guide.md) for benchmark comparisons, pricing, and privacy details.
 
 ---
 

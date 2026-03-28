@@ -140,19 +140,19 @@ Or mount a Kubernetes ConfigMap at `/root/ssh-keys/authorized_keys`.
 
 ## Models
 
-Set `ANTHROPIC_MODEL` to any OpenRouter model ID. Free models are subject to rate limits and availability.
+Set `ANTHROPIC_MODEL` to any OpenRouter model ID. The default is chosen for rate-limit headroom — for best coding quality with occasional use, try `qwen/qwen3-coder:free`.
 
-| Model | Context | Notes |
-| --- | --- | --- |
-| `stepfun/step-3.5-flash:free` | 256K | Default — fast, well-rounded |
-| `qwen/qwen3-coder:free` | 262K | Strong at code generation and agentic tasks |
-| `openai/gpt-oss-120b:free` | 131K | Strong reasoning |
-| `openai/gpt-oss-20b:free` | 131K | Faster, lighter |
-| `nvidia/nemotron-3-super-120b-a12b:free` | 262K | Complex reasoning |
-| `meta-llama/llama-3.3-70b-instruct:free` | 65K | Solid all-rounder |
-| `mistralai/mistral-small-3.1-24b-instruct:free` | 128K | Fast, multimodal |
+| Model | Context | Req/min | Notes |
+| --- | --- | --- | --- |
+| `stepfun/step-3.5-flash:free` | 256K | **50** | **Default** — best availability; SWE-bench 74% |
+| `qwen/qwen3-coder:free` | 262K | 8 | Best coding quality; privacy-safe |
+| `openai/gpt-oss-120b:free` | 131K | — | ⚠ Free provider trains on your prompts |
+| `openai/gpt-oss-20b:free` | 131K | — | ⚠ Free provider trains on your prompts |
+| `nvidia/nemotron-3-super-120b-a12b:free` | 262K | — | ⚠ NVIDIA logs all prompts (trial use only) |
+| `meta-llama/llama-3.3-70b-instruct:free` | 65K | 8 | Simple tasks; context halved on free tier |
+| `google/gemma-3-27b-it:free` | 131K | — | ⚠ No tool use on free tier — incompatible |
 
-Full list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free)
+Full list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free) · [Model guide with benchmarks and pricing](https://github.com/JohnnyFoulds/claude-code-free/blob/main/docs/model-guide.md)
 
 ---
 
