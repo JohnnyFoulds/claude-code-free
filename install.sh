@@ -44,8 +44,9 @@ echo ""
 echo "  This script will:"
 echo "    1. Install Docker if needed, or start it if not running"
 echo "    2. Ask for your free OpenRouter API key"
-echo "    3. Download and start the Claude Code container"
-echo "    4. Configure VS Code Remote SSH"
+echo "    3. Ask where to store your workspace files"
+echo "    4. Download and start the Claude Code container"
+echo "    5. Configure VS Code Remote SSH"
 echo ""
 echo "  Takes about 2-5 minutes on first run."
 echo ""
@@ -307,21 +308,101 @@ for key_file in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
 done
 
 # ---------------------------------------------------------------------------
-# Step 4: Download docker-compose.yml
+# Step 4: Workspace location
 # ---------------------------------------------------------------------------
-heading "Step 4: Downloading configuration"
+heading "Step 4: Workspace location"
+
+DEFAULT_WORKSPACE="${HOME}/claude-workspace"
+
+echo "  Where should your workspace files be stored?"
+echo ""
+echo "  [1] ${DEFAULT_WORKSPACE}  (recommended)"
+echo "      Files saved here are visible in Finder/file manager and easy to back up."
+echo ""
+echo "  [2] Docker volume  (managed by Docker, not directly visible)"
+echo "      Use this if you only access files via VS Code Remote SSH."
+echo ""
+echo "  [3] Custom path"
+echo "      Enter any directory on this machine."
+echo ""
+
+WORKSPACE_TYPE=""
+while true; do
+    read -r -p "  Choose [1/2/3] (default: 1): " WORKSPACE_TYPE
+    WORKSPACE_TYPE="${WORKSPACE_TYPE:-1}"
+    case "$WORKSPACE_TYPE" in
+        1|2|3) break ;;
+        *) warn "Please enter 1, 2, or 3." ;;
+    esac
+done
+
+WORKSPACE_VOLUME=""   # compose volume line
+WORKSPACE_VOLUMES=""  # compose top-level volumes block (only for named volume)
+WORKSPACE_DISPLAY=""  # shown to user in summary
+
+case "$WORKSPACE_TYPE" in
+    1)
+        WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
+        mkdir -p "${WORKSPACE_PATH}"
+        WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+        WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+        ok "Workspace: ${WORKSPACE_PATH}"
+        ;;
+    2)
+        WORKSPACE_VOLUME="      - workspace:/workspace"
+        WORKSPACE_VOLUMES="
+volumes:
+  workspace:"
+        WORKSPACE_DISPLAY="Docker volume (docker volume inspect claude-workspace to locate)"
+        ok "Workspace: Docker named volume"
+        ;;
+    3)
+        while true; do
+            read -r -p "  Enter full path (e.g. /home/you/projects): " WORKSPACE_PATH
+            if [ -z "$WORKSPACE_PATH" ]; then
+                warn "Path cannot be empty."
+            elif [ -d "$WORKSPACE_PATH" ]; then
+                break
+            else
+                read -r -p "  Directory does not exist. Create it? [Y/n] " create_it
+                if [[ "$create_it" != "n" && "$create_it" != "N" ]]; then
+                    mkdir -p "$WORKSPACE_PATH"
+                    break
+                fi
+            fi
+        done
+        WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+        WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+        ok "Workspace: ${WORKSPACE_PATH}"
+        ;;
+esac
+
+# ---------------------------------------------------------------------------
+# Step 5: Write docker-compose.yml and .env, start container
+# ---------------------------------------------------------------------------
+heading "Step 5: Starting container"
 
 mkdir -p "$INSTALL_DIR"
 
-info "Downloading docker-compose.yml..."
-curl -fsSL "${GITHUB_RAW}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml"
-
-ok "Configuration downloaded to ${INSTALL_DIR}"
-
-# ---------------------------------------------------------------------------
-# Step 5: Write .env and start container
-# ---------------------------------------------------------------------------
-heading "Step 5: Starting container"
+# Write a tailored docker-compose.yml based on workspace choice
+cat > "${INSTALL_DIR}/docker-compose.yml" <<EOF
+services:
+  claude-code:
+    image: johannesfoulds/claude-code-free:latest
+    container_name: ${CONTAINER_NAME}
+    ports:
+      - "${SSH_PORT}:22"
+    volumes:
+${WORKSPACE_VOLUME}
+    environment:
+      - ANTHROPIC_BASE_URL=https://openrouter.ai/api
+      - ANTHROPIC_AUTH_TOKEN=\${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=
+      - ANTHROPIC_MODEL=\${OPENROUTER_MODEL:-stepfun/step-3.5-flash:free}
+      - SSH_AUTHORIZED_KEY=\${SSH_AUTHORIZED_KEY:-}
+    restart: unless-stopped
+${WORKSPACE_VOLUMES}
+EOF
 
 cat > "${INSTALL_DIR}/.env" <<EOF
 OPENROUTER_API_KEY=${API_KEY}
@@ -370,6 +451,11 @@ fi
 heading "All done"
 
 echo "  Claude Code is running and ready."
+echo ""
+echo "  ── Workspace ───────────────────────────────────────────────────"
+echo "  Your files are stored at:"
+echo "    ${WORKSPACE_DISPLAY}"
+echo "  Inside the container this is /workspace."
 echo ""
 echo "  ── SSH access ──────────────────────────────────────────────────"
 echo "  Direct SSH:"

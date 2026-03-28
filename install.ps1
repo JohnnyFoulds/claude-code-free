@@ -24,12 +24,6 @@ function Warn    { param($msg) Write-Host "  [!] $msg" -ForegroundColor Yellow }
 function Err     { param($msg) Write-Host "  [x] $msg" -ForegroundColor Red }
 function Heading { param($msg) Write-Host "`n--- $msg ---`n" -ForegroundColor Cyan }
 
-function Download {
-    param($file)
-    Info "Downloading $file..."
-    Invoke-WebRequest -Uri "$GITHUB_RAW/$file" -OutFile "$INSTALL_DIR\$file" -UseBasicParsing
-}
-
 function WaitForDocker {
     Info "Waiting for Docker to be ready..."
     $elapsed = 0
@@ -62,8 +56,9 @@ Write-Host ""
 Write-Host "  This script will:"
 Write-Host "    1. Install Docker if needed, or start it if not running"
 Write-Host "    2. Ask for your free OpenRouter API key"
-Write-Host "    3. Download and start the Claude Code container"
-Write-Host "    4. Configure VS Code Remote SSH"
+Write-Host "    3. Ask where to store your workspace files"
+Write-Host "    4. Download and start the Claude Code container"
+Write-Host "    5. Configure VS Code Remote SSH"
 Write-Host ""
 Write-Host "  Takes about 2-5 minutes on first run."
 Write-Host ""
@@ -128,7 +123,6 @@ if (-not $dockerInstalled) {
         if (Test-Path $dockerExe) {
             Start-Process $dockerExe
         } else {
-            # Try finding it
             $found = Get-ChildItem "C:\Program Files\Docker" -Recurse -Filter "Docker Desktop.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($found) {
                 Start-Process $found.FullName
@@ -222,18 +216,100 @@ foreach ($keyPath in $sshKeyPaths) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 4: Download docker-compose.yml
+# Step 4: Workspace location
 # ---------------------------------------------------------------------------
-Heading "Step 4: Downloading configuration"
+Heading "Step 4: Workspace location"
 
-New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
-Download "docker-compose.yml"
-Ok "Configuration downloaded to $INSTALL_DIR"
+$defaultWorkspace = "$env:USERPROFILE\claude-workspace"
+
+Write-Host "  Where should your workspace files be stored?"
+Write-Host ""
+Write-Host "  [1] $defaultWorkspace  (recommended)"
+Write-Host "      Files saved here are visible in File Explorer and easy to back up."
+Write-Host ""
+Write-Host "  [2] Docker volume  (managed by Docker, not directly visible)"
+Write-Host "      Use this if you only access files via VS Code Remote SSH."
+Write-Host ""
+Write-Host "  [3] Custom path"
+Write-Host "      Enter any directory on this machine."
+Write-Host ""
+
+$workspaceType = ""
+while ($true) {
+    $workspaceType = Read-Host "  Choose [1/2/3] (default: 1)"
+    if (-not $workspaceType) { $workspaceType = "1" }
+    if ($workspaceType -in @("1","2","3")) { break }
+    Warn "Please enter 1, 2, or 3."
+}
+
+$workspaceVolumeLine = ""    # the volumes: entry in compose
+$workspaceVolumesBlock = ""  # top-level volumes: block (named volume only)
+$workspaceDisplay = ""       # shown to user in summary
+
+switch ($workspaceType) {
+    "1" {
+        $workspacePath = $defaultWorkspace
+        New-Item -ItemType Directory -Force -Path $workspacePath | Out-Null
+        # Docker on Windows needs forward slashes or the Windows path with drive letter
+        $workspaceVolumeLine = "      - ${workspacePath}:/workspace"
+        $workspaceDisplay = $workspacePath
+        Ok "Workspace: $workspacePath"
+    }
+    "2" {
+        $workspaceVolumeLine = "      - workspace:/workspace"
+        $workspaceVolumesBlock = "`nvolumes:`n  workspace:"
+        $workspaceDisplay = "Docker volume (run 'docker volume inspect workspace' to locate)"
+        Ok "Workspace: Docker named volume"
+    }
+    "3" {
+        while ($true) {
+            $workspacePath = Read-Host "  Enter full path (e.g. C:\Users\you\projects)"
+            if (-not $workspacePath) {
+                Warn "Path cannot be empty."
+            } elseif (Test-Path $workspacePath) {
+                break
+            } else {
+                $createIt = Read-Host "  Directory does not exist. Create it? [Y/n]"
+                if ($createIt -notmatch "^[Nn]") {
+                    New-Item -ItemType Directory -Force -Path $workspacePath | Out-Null
+                    break
+                }
+            }
+        }
+        $workspaceVolumeLine = "      - ${workspacePath}:/workspace"
+        $workspaceDisplay = $workspacePath
+        Ok "Workspace: $workspacePath"
+    }
+}
 
 # ---------------------------------------------------------------------------
-# Step 5: Write .env and start container
+# Step 5: Write docker-compose.yml and .env, start container
 # ---------------------------------------------------------------------------
 Heading "Step 5: Starting container"
+
+New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
+
+# Write a tailored docker-compose.yml based on workspace choice
+$composeContent = @"
+services:
+  claude-code:
+    image: johannesfoulds/claude-code-free:latest
+    container_name: $CONTAINER_NAME
+    ports:
+      - "${SSH_PORT}:22"
+    volumes:
+$workspaceVolumeLine
+    environment:
+      - ANTHROPIC_BASE_URL=https://openrouter.ai/api
+      - ANTHROPIC_AUTH_TOKEN=`${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=
+      - ANTHROPIC_MODEL=`${OPENROUTER_MODEL:-stepfun/step-3.5-flash:free}
+      - SSH_AUTHORIZED_KEY=`${SSH_AUTHORIZED_KEY:-}
+    restart: unless-stopped
+$workspaceVolumesBlock
+"@
+
+Set-Content -Path "$INSTALL_DIR\docker-compose.yml" -Value $composeContent
 
 $envContent = "OPENROUTER_API_KEY=$apiKey`nOPENROUTER_MODEL=$model`nSSH_AUTHORIZED_KEY=$sshPubKey"
 Set-Content -Path "$INSTALL_DIR\.env" -Value $envContent
@@ -289,6 +365,11 @@ if (Test-Path $sshConfig) {
 Heading "All done"
 
 Write-Host "  Claude Code is running and ready."
+Write-Host ""
+Write-Host "  ── Workspace ───────────────────────────────────────────────────"
+Write-Host "  Your files are stored at:"
+Write-Host "    $workspaceDisplay"
+Write-Host "  Inside the container this is /workspace."
 Write-Host ""
 Write-Host "  ── SSH access ──────────────────────────────────────────────────"
 Write-Host "  Direct SSH:"
