@@ -69,7 +69,7 @@ install_docker_mac() {
     warn "Docker Desktop is not installed."
     echo ""
     read -r -p "  Install Docker Desktop now? [Y/n] " answer
-    if [[ "${answer,,}" == "n" ]]; then
+    if [[ "$answer" == "n" || "$answer" == "N" ]]; then
         echo ""
         echo "  Install it from: https://www.docker.com/products/docker-desktop/"
         echo "  Then re-run this script."
@@ -123,7 +123,7 @@ install_docker_linux() {
     warn "Docker is not installed."
     echo ""
     read -r -p "  Install Docker Engine now? (requires sudo) [Y/n] " answer
-    if [[ "${answer,,}" == "n" ]]; then
+    if [[ "$answer" == "n" || "$answer" == "N" ]]; then
         echo ""
         echo "  Install it from: https://docs.docker.com/engine/install/"
         echo "  Then re-run this script."
@@ -183,7 +183,7 @@ install_docker_linux() {
 start_docker_mac() {
     warn "Docker Desktop is installed but not running."
     read -r -p "  Start Docker Desktop now? [Y/n] " answer
-    if [[ "${answer,,}" == "n" ]]; then
+    if [[ "$answer" == "n" || "$answer" == "N" ]]; then
         echo ""
         echo "  Please start Docker Desktop manually and re-run this script."
         exit 0
@@ -227,7 +227,7 @@ if ! docker info &> /dev/null; then
         Linux)
             warn "Docker is installed but not running."
             read -r -p "  Start Docker daemon now? (requires sudo) [Y/n] " answer
-            if [[ "${answer,,}" == "n" ]]; then
+            if [[ "$answer" == "n" || "$answer" == "N" ]]; then
                 echo "  Please start Docker manually and re-run this script."
                 exit 0
             fi
