@@ -349,19 +349,36 @@ heading "All done"
 
 echo "  Claude Code is running and ready."
 echo ""
-echo "  Connect from VS Code:"
-echo "    1. Install the 'Remote - SSH' extension (if not already installed)"
-echo "    2. Press Cmd+Shift+P (Mac) or Ctrl+Shift+P (Linux)"
-echo "    3. Type:   Remote-SSH: Connect to Host"
-echo "    4. Select: ${SSH_CONFIG_HOST}"
+echo "  ── SSH access ──────────────────────────────────────────────────"
+echo "  Direct SSH:"
+echo "    ssh -p ${SSH_PORT} coder@localhost"
 if [ -z "$SSH_PUB_KEY" ]; then
-    echo "    5. Password: coder"
+    echo "    Password: coder"
 fi
 echo ""
-echo "  Once connected, open a VS Code terminal and run:"
+echo "  ── VS Code Remote SSH ──────────────────────────────────────────"
+echo "  1. Install the 'Remote - SSH' extension (if not already installed)"
+echo "  2. Press Cmd+Shift+P (Mac) or Ctrl+Shift+P (Linux)"
+echo "  3. Type:   Remote-SSH: Connect to Host"
+echo "  4. Select: ${SSH_CONFIG_HOST}"
+if [ -z "$SSH_PUB_KEY" ]; then
+    echo "  5. Password: coder"
+fi
+echo ""
+echo "  ── Once inside the container ───────────────────────────────────"
 echo "    cd /workspace"
 echo "    claude"
 echo ""
-echo "  To stop:    docker compose -f ${INSTALL_DIR}/docker-compose.yml down"
-echo "  To restart: docker compose -f ${INSTALL_DIR}/docker-compose.yml up -d"
+echo "  ── Daily commands ──────────────────────────────────────────────"
+echo "  Stop:    docker compose -f ${INSTALL_DIR}/docker-compose.yml down"
+echo "  Start:   docker compose -f ${INSTALL_DIR}/docker-compose.yml up -d"
 echo ""
+
+read -r -p "  Try Claude Code right now? [Y/n] " try_now
+if [[ "$try_now" != "n" && "$try_now" != "N" ]]; then
+    echo ""
+    echo "  Connecting... (type 'exit' to leave the container)"
+    echo ""
+    exec ssh -t -o StrictHostKeyChecking=no -p "${SSH_PORT}" coder@localhost \
+        "bash -l -c 'cd /workspace && exec claude'"
+fi
