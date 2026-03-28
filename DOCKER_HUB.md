@@ -160,7 +160,7 @@ Full list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free) ·
 
 | Component | Details |
 | --- | --- |
-| Base image | `node:22-alpine` |
+| Base image | `node:22-slim` (Debian) |
 | Claude Code | Latest stable (`@anthropic-ai/claude-code`) |
 | Node.js | 22 LTS |
 | Python | 3 (system) |

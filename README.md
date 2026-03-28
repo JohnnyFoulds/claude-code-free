@@ -117,7 +117,7 @@ Claude Code speaks the OpenAI API format. This project points it at OpenRouter, 
 
 | Component | Details |
 | --- | --- |
-| OS | Alpine Linux (`node:22-alpine`) |
+| OS | Debian (`node:22-slim`) |
 | Claude Code | Latest stable release |
 | Node.js | 22 LTS |
 | Python | 3 (system) |
