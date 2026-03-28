@@ -86,6 +86,8 @@ docker compose -f ~/.claude-code-free/docker-compose.yml down
 docker compose --env-file ~/.claude-code-free/.env -f ~/.claude-code-free/docker-compose.yml up -d
 ```
 
+> **Note:** The `/model` command inside Claude Code will not work here — it is designed for Anthropic's own model roster and does not know about OpenRouter models. Use `.env` to switch models instead.
+
 ### Free models worth trying
 
 All of these work with a free OpenRouter account. No credit card needed.
