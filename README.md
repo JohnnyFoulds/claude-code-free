@@ -135,7 +135,7 @@ Claude Code is built to work with any OpenAI-compatible API. This project points
 
 | Component | Version |
 | --- | --- |
-| OS | Ubuntu 24.04 |
+| OS | Alpine Linux (node:22-alpine) |
 | Claude Code | latest |
 | Node.js | 22 LTS |
 | Python | 3 (system) |
