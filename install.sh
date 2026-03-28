@@ -485,8 +485,22 @@ echo ""
 read -r -p "  Try Claude Code right now? [Y/n] " try_now
 if [[ "$try_now" != "n" && "$try_now" != "N" ]]; then
     echo ""
-    echo "  Connecting... (type 'exit' to leave the container)"
-    echo ""
-    exec ssh -t -o StrictHostKeyChecking=no -p "${SSH_PORT}" coder@localhost \
-        "bash -l -c 'cd /workspace && exec claude'"
+    info "Waiting for SSH to be ready..."
+    ssh_ready=false
+    for i in $(seq 1 20); do
+        if bash -c "echo >/dev/tcp/localhost/${SSH_PORT}" 2>/dev/null; then
+            ssh_ready=true
+            break
+        fi
+        sleep 3
+    done
+    if [ "$ssh_ready" = false ]; then
+        warn "SSH not ready after 60s. Connect manually with:"
+        echo "  ssh -p ${SSH_PORT} coder@localhost"
+    else
+        echo "  Connecting... (type 'exit' to leave the container)"
+        echo ""
+        exec ssh -t -o StrictHostKeyChecking=no -p "${SSH_PORT}" coder@localhost \
+            "bash -l -c 'cd /workspace && exec claude'"
+    fi
 fi

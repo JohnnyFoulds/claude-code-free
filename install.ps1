@@ -94,6 +94,10 @@ if (-not $dockerInstalled) {
     $installerPath = "$env:TEMP\DockerDesktopInstaller.exe"
     Invoke-WebRequest -Uri $dockerUrl -OutFile $installerPath -UseBasicParsing
     Info "Running Docker Desktop installer (you may see a UAC prompt — click Yes)..."
+    Write-Host ""
+    Warn "NOTE: The Docker Desktop installer may close this terminal when it finishes."
+    Warn "If that happens, simply re-run this script — Docker will already be installed."
+    Write-Host ""
     Start-Process -FilePath $installerPath -ArgumentList "install", "--quiet", "--accept-license" -Wait
     Remove-Item $installerPath -Force
 
@@ -399,7 +403,24 @@ Write-Host ""
 $tryNow = Read-Host "  Try Claude Code right now? [Y/n]"
 if ($tryNow -notmatch "^[Nn]") {
     Write-Host ""
-    Write-Host "  Connecting... (type 'exit' to leave the container)"
-    Write-Host ""
-    ssh -t -o StrictHostKeyChecking=no -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
+    Info "Waiting for SSH to be ready..."
+    $sshReady = $false
+    for ($i = 0; $i -lt 20; $i++) {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        try {
+            $tcp.Connect("localhost", $SSH_PORT)
+            $sshReady = $true
+            $tcp.Close()
+            break
+        } catch {}
+        Start-Sleep -Seconds 3
+    }
+    if (-not $sshReady) {
+        Warn "SSH not ready after 60s. Connect manually with:"
+        Write-Host "  ssh -p $SSH_PORT coder@localhost"
+    } else {
+        Write-Host "  Connecting... (type 'exit' to leave the container)"
+        Write-Host ""
+        ssh -t -o StrictHostKeyChecking=no -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
+    }
 }
