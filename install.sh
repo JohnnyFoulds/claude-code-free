@@ -9,12 +9,6 @@
 
 set -euo pipefail
 
-# When piped (curl | bash), stdin is the script — reopen from /dev/tty so that
-# interactive prompts work. The || true prevents set -e from aborting if unavailable.
-if [ ! -t 0 ]; then
-    exec < /dev/tty || true
-fi
-
 GITHUB_RAW="https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
 INSTALL_DIR="${HOME}/.claude-code-free"
 CONTAINER_NAME="claude-code-free"
@@ -30,6 +24,17 @@ ok()      { echo -e "${GREEN}[✓]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[!]${NC} $*"; }
 error()   { echo -e "${RED}[✗]${NC} $*" >&2; }
 heading() { echo ""; echo -e "${CYAN}━━━ $* ━━━${NC}"; echo ""; }
+
+# ---------------------------------------------------------------------------
+# Detect whether stdin is a real terminal.
+# When piped (curl | bash), PIPED=true and we skip optional interactive
+# prompts. Mandatory prompts (API key) read directly from /dev/tty.
+# ---------------------------------------------------------------------------
+if [ -t 0 ]; then
+    PIPED=false
+else
+    PIPED=true
+fi
 
 # ---------------------------------------------------------------------------
 # Parse args
@@ -56,7 +61,9 @@ echo "    5. Configure VS Code Remote SSH"
 echo ""
 echo "  Takes about 2-5 minutes on first run."
 echo ""
-read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
+if [ "$PIPED" = false ]; then
+    read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
+fi
 
 # ---------------------------------------------------------------------------
 # Detect OS
@@ -72,7 +79,11 @@ heading "Step 1: Docker"
 install_docker_mac() {
     warn "Docker Desktop is not installed."
     echo ""
-    read -r -p "  Install Docker Desktop now? [Y/n] " answer
+    if [ "$PIPED" = true ]; then
+        read -r -p "  Install Docker Desktop now? [Y/n] " answer </dev/tty
+    else
+        read -r -p "  Install Docker Desktop now? [Y/n] " answer
+    fi
     if [[ "$answer" == "n" || "$answer" == "N" ]]; then
         echo ""
         echo "  Install it from: https://www.docker.com/products/docker-desktop/"
@@ -126,7 +137,11 @@ install_docker_mac() {
 install_docker_linux() {
     warn "Docker is not installed."
     echo ""
-    read -r -p "  Install Docker Engine now? (requires sudo) [Y/n] " answer
+    if [ "$PIPED" = true ]; then
+        read -r -p "  Install Docker Engine now? (requires sudo) [Y/n] " answer </dev/tty
+    else
+        read -r -p "  Install Docker Engine now? (requires sudo) [Y/n] " answer
+    fi
     if [[ "$answer" == "n" || "$answer" == "N" ]]; then
         echo ""
         echo "  Install it from: https://docs.docker.com/engine/install/"
@@ -186,7 +201,11 @@ install_docker_linux() {
 
 start_docker_mac() {
     warn "Docker Desktop is installed but not running."
-    read -r -p "  Start Docker Desktop now? [Y/n] " answer
+    if [ "$PIPED" = true ]; then
+        read -r -p "  Start Docker Desktop now? [Y/n] " answer </dev/tty
+    else
+        read -r -p "  Start Docker Desktop now? [Y/n] " answer
+    fi
     if [[ "$answer" == "n" || "$answer" == "N" ]]; then
         echo ""
         echo "  Please start Docker Desktop manually and re-run this script."
@@ -230,7 +249,11 @@ if ! docker info &> /dev/null; then
         Darwin) start_docker_mac ;;
         Linux)
             warn "Docker is installed but not running."
-            read -r -p "  Start Docker daemon now? (requires sudo) [Y/n] " answer
+            if [ "$PIPED" = true ]; then
+                read -r -p "  Start Docker daemon now? (requires sudo) [Y/n] " answer </dev/tty
+            else
+                read -r -p "  Start Docker daemon now? (requires sudo) [Y/n] " answer
+            fi
             if [[ "$answer" == "n" || "$answer" == "N" ]]; then
                 echo "  Please start Docker manually and re-run this script."
                 exit 0
@@ -267,7 +290,11 @@ if [ -z "$API_KEY" ]; then
     echo "  The key looks like: sk-or-v1-abc123..."
     echo ""
     while true; do
-        read -r -p "  Paste your OpenRouter API key: " API_KEY
+        if [ "$PIPED" = true ]; then
+            read -r -p "  Paste your OpenRouter API key: " API_KEY </dev/tty
+        else
+            read -r -p "  Paste your OpenRouter API key: " API_KEY
+        fi
         if [[ "$API_KEY" == sk-or-v1-* ]]; then
             break
         else
@@ -285,12 +312,14 @@ DEFAULT_MODEL="stepfun/step-3.5-flash:free"
 MODEL="${OPENROUTER_MODEL:-}"
 
 if [ -z "$MODEL" ]; then
-    echo ""
-    echo "  Default model: ${DEFAULT_MODEL}"
-    echo "  To use a different OpenRouter model, enter its ID below."
-    echo "  Press Enter to keep the default."
-    echo ""
-    read -r -p "  Model ID (or Enter for default): " MODEL
+    if [ "$PIPED" = false ]; then
+        echo ""
+        echo "  Default model: ${DEFAULT_MODEL}"
+        echo "  To use a different OpenRouter model, enter its ID below."
+        echo "  Press Enter to keep the default."
+        echo ""
+        read -r -p "  Model ID (or Enter for default): " MODEL
+    fi
 fi
 
 if [ -z "$MODEL" ]; then
@@ -319,68 +348,77 @@ heading "Step 4: Workspace location"
 
 DEFAULT_WORKSPACE="${HOME}/claude-workspace"
 
-echo "  Where should your workspace files be stored?"
-echo ""
-echo "  [1] ${DEFAULT_WORKSPACE}  (recommended)"
-echo "      Files saved here are visible in Finder/file manager and easy to back up."
-echo ""
-echo "  [2] Docker volume  (managed by Docker, not directly visible)"
-echo "      Use this if you only access files via VS Code Remote SSH."
-echo ""
-echo "  [3] Custom path"
-echo "      Enter any directory on this machine."
-echo ""
-
-WORKSPACE_TYPE=""
-while true; do
-    read -r -p "  Choose [1/2/3] (default: 1): " WORKSPACE_TYPE
-    WORKSPACE_TYPE="${WORKSPACE_TYPE:-1}"
-    case "$WORKSPACE_TYPE" in
-        1|2|3) break ;;
-        *) warn "Please enter 1, 2, or 3." ;;
-    esac
-done
-
 WORKSPACE_VOLUME=""   # compose volume line
 WORKSPACE_VOLUMES=""  # compose top-level volumes block (only for named volume)
 WORKSPACE_DISPLAY=""  # shown to user in summary
 
-case "$WORKSPACE_TYPE" in
-    1)
-        WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
-        mkdir -p "${WORKSPACE_PATH}"
-        WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
-        WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
-        ok "Workspace: ${WORKSPACE_PATH}"
-        ;;
-    2)
-        WORKSPACE_VOLUME="      - workspace:/workspace"
-        WORKSPACE_VOLUMES="
+if [ "$PIPED" = true ]; then
+    # Use default workspace when piped — no interactive selection possible
+    WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
+    mkdir -p "${WORKSPACE_PATH}"
+    WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+    WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+    ok "Workspace: ${WORKSPACE_PATH} (default)"
+else
+    echo "  Where should your workspace files be stored?"
+    echo ""
+    echo "  [1] ${DEFAULT_WORKSPACE}  (recommended)"
+    echo "      Files saved here are visible in Finder/file manager and easy to back up."
+    echo ""
+    echo "  [2] Docker volume  (managed by Docker, not directly visible)"
+    echo "      Use this if you only access files via VS Code Remote SSH."
+    echo ""
+    echo "  [3] Custom path"
+    echo "      Enter any directory on this machine."
+    echo ""
+
+    WORKSPACE_TYPE=""
+    while true; do
+        read -r -p "  Choose [1/2/3] (default: 1): " WORKSPACE_TYPE
+        WORKSPACE_TYPE="${WORKSPACE_TYPE:-1}"
+        case "$WORKSPACE_TYPE" in
+            1|2|3) break ;;
+            *) warn "Please enter 1, 2, or 3." ;;
+        esac
+    done
+
+    case "$WORKSPACE_TYPE" in
+        1)
+            WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
+            mkdir -p "${WORKSPACE_PATH}"
+            WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+            WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+            ok "Workspace: ${WORKSPACE_PATH}"
+            ;;
+        2)
+            WORKSPACE_VOLUME="      - workspace:/workspace"
+            WORKSPACE_VOLUMES="
 volumes:
   workspace:"
-        WORKSPACE_DISPLAY="Docker volume (docker volume inspect claude-workspace to locate)"
-        ok "Workspace: Docker named volume"
-        ;;
-    3)
-        while true; do
-            read -r -p "  Enter full path (e.g. /home/you/projects): " WORKSPACE_PATH
-            if [ -z "$WORKSPACE_PATH" ]; then
-                warn "Path cannot be empty."
-            elif [ -d "$WORKSPACE_PATH" ]; then
-                break
-            else
-                read -r -p "  Directory does not exist. Create it? [Y/n] " create_it
-                if [[ "$create_it" != "n" && "$create_it" != "N" ]]; then
-                    mkdir -p "$WORKSPACE_PATH"
+            WORKSPACE_DISPLAY="Docker volume (docker volume inspect claude-workspace to locate)"
+            ok "Workspace: Docker named volume"
+            ;;
+        3)
+            while true; do
+                read -r -p "  Enter full path (e.g. /home/you/projects): " WORKSPACE_PATH
+                if [ -z "$WORKSPACE_PATH" ]; then
+                    warn "Path cannot be empty."
+                elif [ -d "$WORKSPACE_PATH" ]; then
                     break
+                else
+                    read -r -p "  Directory does not exist. Create it? [Y/n] " create_it
+                    if [[ "$create_it" != "n" && "$create_it" != "N" ]]; then
+                        mkdir -p "$WORKSPACE_PATH"
+                        break
+                    fi
                 fi
-            fi
-        done
-        WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
-        WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
-        ok "Workspace: ${WORKSPACE_PATH}"
-        ;;
-esac
+            done
+            WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+            WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+            ok "Workspace: ${WORKSPACE_PATH}"
+            ;;
+    esac
+fi
 
 # ---------------------------------------------------------------------------
 # Step 5: Write docker-compose.yml and .env, start container
@@ -489,7 +527,11 @@ echo "  Stop:    docker compose -f ${INSTALL_DIR}/docker-compose.yml down"
 echo "  Start:   docker compose -f ${INSTALL_DIR}/docker-compose.yml up -d"
 echo ""
 
-read -r -p "  Try Claude Code right now? [Y/n] " try_now
+if [ "$PIPED" = true ]; then
+    read -r -p "  Try Claude Code right now? [Y/n] " try_now </dev/tty
+else
+    read -r -p "  Try Claude Code right now? [Y/n] " try_now
+fi
 if [[ "$try_now" != "n" && "$try_now" != "N" ]]; then
     echo ""
     info "Waiting for SSH to be ready..."
