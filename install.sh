@@ -50,10 +50,12 @@ echo "    5. Configure VS Code Remote SSH"
 echo ""
 echo "  Takes about 2-5 minutes on first run."
 echo ""
-# Skip prompt if running non-interactively (piped)
-if [ -t 0 ]; then
-    read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
+# When piped (curl | bash), stdin is the script not the terminal.
+# Reopen stdin from /dev/tty so all interactive prompts work correctly.
+if [ ! -t 0 ]; then
+    exec < /dev/tty
 fi
+read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
 
 # ---------------------------------------------------------------------------
 # Detect OS
