@@ -3,8 +3,8 @@
 Run [Claude Code](https://claude.ai/code) with free AI models on your own machine — no Anthropic subscription required.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-![Docker Pulls](https://img.shields.io/docker/pulls/johannesfoulds/claude-code-free)
-![Docker Image Size](https://img.shields.io/docker/image-size/johannesfoulds/claude-code-free/latest)
+[![Docker Pulls](https://img.shields.io/docker/pulls/johannesfoulds/claude-code-free)](https://hub.docker.com/r/johannesfoulds/claude-code-free)
+[![Docker Image Size](https://img.shields.io/docker/image-size/johannesfoulds/claude-code-free/latest)](https://hub.docker.com/r/johannesfoulds/claude-code-free)
 
 Powered by [OpenRouter](https://openrouter.ai). One free API key gives you access to dozens of capable models through a single interface.
 
