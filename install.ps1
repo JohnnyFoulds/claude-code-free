@@ -82,6 +82,10 @@ if (-not $dockerInstalled) {
         exit 0
     }
     Write-Host ""
+    Write-Host ""
+    Warn "NOTE: The Docker Desktop installer may close this terminal when it finishes."
+    Warn "If that happens, simply re-run this script — Docker will already be installed."
+    Write-Host ""
     Info "Downloading Docker Desktop installer..."
 
     $arch = (Get-WmiObject Win32_OperatingSystem).OSArchitecture
@@ -94,10 +98,6 @@ if (-not $dockerInstalled) {
     $installerPath = "$env:TEMP\DockerDesktopInstaller.exe"
     Invoke-WebRequest -Uri $dockerUrl -OutFile $installerPath -UseBasicParsing
     Info "Running Docker Desktop installer (you may see a UAC prompt — click Yes)..."
-    Write-Host ""
-    Warn "NOTE: The Docker Desktop installer may close this terminal when it finishes."
-    Warn "If that happens, simply re-run this script — Docker will already be installed."
-    Write-Host ""
     Start-Process -FilePath $installerPath -ArgumentList "install", "--quiet", "--accept-license" -Wait
     Remove-Item $installerPath -Force
 
