@@ -320,7 +320,7 @@ Set-Content -Path "$INSTALL_DIR\.env" -Value $envContent
 $existing = docker ps -aq --filter "name=^${CONTAINER_NAME}$" 2>$null
 if ($existing) {
     Info "Removing existing container..."
-    docker compose -f "$INSTALL_DIR\docker-compose.yml" down 2>$null
+    docker compose -f "$INSTALL_DIR\docker-compose.yml" down 2>&1 | Out-Null
 }
 
 Info "Pulling and starting Claude Code container..."
