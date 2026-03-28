@@ -1,6 +1,8 @@
 # johannesfoulds/claude-code-free
 
-Run [Claude Code](https://claude.ai/code) in a container using free AI models via [OpenRouter](https://openrouter.ai) — no Anthropic subscription required.
+A full AI pair programmer in VS Code, running locally in a container, connected and ready in 2 minutes — at zero cost.
+
+[Claude Code](https://claude.ai/code) — Anthropic's own coding agent — running against free models via [OpenRouter](https://openrouter.ai). No Anthropic subscription. No credit card. One free API key and one command.
 
 **Maintained by:** [Johannes Foulds](https://github.com/JohnnyFoulds/claude-code-free)
 **Where to get help:** [GitHub Issues](https://github.com/JohnnyFoulds/claude-code-free/issues) · [Source repository](https://github.com/JohnnyFoulds/claude-code-free)
