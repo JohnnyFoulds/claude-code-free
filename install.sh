@@ -278,10 +278,7 @@ ok "API key accepted."
 # Step 2b: Model selection (optional)
 # ---------------------------------------------------------------------------
 DEFAULT_MODEL="stepfun/step-3.5-flash:free"
-MODEL=""
-if [ "${1:-}" = "--model" ]; then
-    MODEL="${2:-}"
-fi
+MODEL="${OPENROUTER_MODEL:-}"
 
 if [ -z "$MODEL" ]; then
     echo ""
