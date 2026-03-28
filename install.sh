@@ -9,6 +9,12 @@
 
 set -euo pipefail
 
+# When piped (curl | bash), stdin is the script — reopen from /dev/tty immediately
+# so all interactive prompts (read) receive terminal input for the rest of the script.
+if [ ! -t 0 ]; then
+    exec < /dev/tty
+fi
+
 GITHUB_RAW="https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
 INSTALL_DIR="${HOME}/.claude-code-free"
 CONTAINER_NAME="claude-code-free"
@@ -50,10 +56,6 @@ echo "    5. Configure VS Code Remote SSH"
 echo ""
 echo "  Takes about 2-5 minutes on first run."
 echo ""
-# When piped (curl | bash), reopen stdin from /dev/tty for interactive prompts.
-if [ ! -t 0 ]; then
-    exec < /dev/tty
-fi
 read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
 
 # ---------------------------------------------------------------------------
