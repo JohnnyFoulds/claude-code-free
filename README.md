@@ -125,8 +125,9 @@ VS Code (your laptop)
             └── Docker container  (johannesfoulds/claude-code-free)
                     ├── Claude Code CLI
                     ├── Python 3
+                    ├── w3m / curl  ← web access for the model
                     └── /workspace  ← your files live here
-                            └── OpenRouter API → your chosen model
+                    └── OpenRouter API → your chosen model
 ```
 
 Claude Code is built to work with any OpenAI-compatible API. This project points it at OpenRouter, which provides access to dozens of free and low-cost models through a single API key.
@@ -139,8 +140,7 @@ Claude Code is built to work with any OpenAI-compatible API. This project points
 | Claude Code | latest |
 | Node.js | 22 LTS |
 | Python | 3 (system) |
-
-> If you need conda environments, run `curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh | bash` inside the container to install Miniconda into `/workspace`.
+| Web access | w3m, curl, markdownify |
 
 ## Known limitations
 
