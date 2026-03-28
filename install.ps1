@@ -122,17 +122,15 @@ foreach ($keyPath in $sshKeyPaths) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 4: Download files
+# Step 4: Download docker-compose.yml
 # ---------------------------------------------------------------------------
-Heading "Step 4: Downloading container files"
+Heading "Step 4: Downloading configuration"
 
 New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
 
-foreach ($file in @("Dockerfile", "entrypoint.sh", "set-env.sh", "docker-compose.yml")) {
-    Download $file
-}
+Download "docker-compose.yml"
 
-Ok "Files downloaded to $INSTALL_DIR"
+Ok "Configuration downloaded to $INSTALL_DIR"
 
 # ---------------------------------------------------------------------------
 # Step 5: Write .env and start container
@@ -149,10 +147,10 @@ if ($existing) {
     docker compose -f "$INSTALL_DIR\docker-compose.yml" down 2>$null
 }
 
-Info "Building and starting Claude Code container..."
-Info "(First run downloads ~500 MB and takes a few minutes)"
+Info "Pulling and starting Claude Code container..."
+Info "(First run downloads ~1 GB — should take about a minute on a good connection)"
 Write-Host ""
-docker compose --env-file "$INSTALL_DIR\.env" -f "$INSTALL_DIR\docker-compose.yml" up -d --build
+docker compose --env-file "$INSTALL_DIR\.env" -f "$INSTALL_DIR\docker-compose.yml" up -d --pull always
 Write-Host ""
 Ok "Container started."
 

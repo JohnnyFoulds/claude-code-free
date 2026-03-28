@@ -117,18 +117,16 @@ for key_file in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
 done
 
 # ---------------------------------------------------------------------------
-# Step 4: Download files
+# Step 4: Download docker-compose.yml
 # ---------------------------------------------------------------------------
-heading "Step 4: Downloading container files"
+heading "Step 4: Downloading configuration"
 
 mkdir -p "$INSTALL_DIR"
 
-for file in Dockerfile entrypoint.sh set-env.sh docker-compose.yml; do
-    info "Downloading $file..."
-    curl -fsSL "${GITHUB_RAW}/${file}" -o "${INSTALL_DIR}/${file}"
-done
+info "Downloading docker-compose.yml..."
+curl -fsSL "${GITHUB_RAW}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml"
 
-ok "Files downloaded to ${INSTALL_DIR}"
+ok "Configuration downloaded to ${INSTALL_DIR}"
 
 # ---------------------------------------------------------------------------
 # Step 5: Write .env and start container
@@ -146,10 +144,10 @@ if docker ps -aq --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
     docker compose -f "${INSTALL_DIR}/docker-compose.yml" down 2>/dev/null || true
 fi
 
-info "Building and starting Claude Code container..."
-info "(First run downloads ~500 MB and takes a few minutes)"
+info "Pulling and starting Claude Code container..."
+info "(First run downloads ~1 GB — should take about a minute on a good connection)"
 echo ""
-docker compose --env-file "${INSTALL_DIR}/.env" -f "${INSTALL_DIR}/docker-compose.yml" up -d --build
+docker compose --env-file "${INSTALL_DIR}/.env" -f "${INSTALL_DIR}/docker-compose.yml" up -d --pull always
 echo ""
 ok "Container started."
 
