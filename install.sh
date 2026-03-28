@@ -297,25 +297,17 @@ fi
 ok "Model: ${MODEL}"
 
 # ---------------------------------------------------------------------------
-# Step 3: SSH public key — use existing or generate one silently
+# Step 3: SSH public key — use dedicated passwordless key for claude-code-free
 # ---------------------------------------------------------------------------
 mkdir -p "${HOME}/.ssh"
 chmod 700 "${HOME}/.ssh"
 
-SSH_PUB_KEY=""
-for key_file in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
-    if [ -f "$key_file" ]; then
-        SSH_PUB_KEY=$(cat "$key_file")
-        break
-    fi
-done
-
-if [ -z "$SSH_PUB_KEY" ]; then
-    info "No SSH key found — generating one for passwordless access..."
-    ssh-keygen -t ed25519 -f "${HOME}/.ssh/id_ed25519" -N "" -q
-    SSH_PUB_KEY=$(cat "${HOME}/.ssh/id_ed25519.pub")
-    ok "SSH key generated."
+# Always use a dedicated key so we never rely on a user key that may have a passphrase.
+CLAUDE_KEY="${HOME}/.ssh/id_ed25519_claude_code_free"
+if [ ! -f "${CLAUDE_KEY}.pub" ]; then
+    ssh-keygen -t ed25519 -f "$CLAUDE_KEY" -N "" -q
 fi
+SSH_PUB_KEY=$(cat "${CLAUDE_KEY}.pub")
 
 # ---------------------------------------------------------------------------
 # Step 4: Workspace location
@@ -450,6 +442,7 @@ Host ${SSH_CONFIG_HOST}
     HostName localhost
     Port ${SSH_PORT}
     User coder
+    IdentityFile ${CLAUDE_KEY}
     StrictHostKeyChecking no
 EOF
     ok "SSH config entry added."
@@ -510,7 +503,7 @@ if [[ "$try_now" != "n" && "$try_now" != "N" ]]; then
     else
         echo "  Connecting... (type 'exit' to leave the container)"
         echo ""
-        exec ssh -t -o StrictHostKeyChecking=no -p "${SSH_PORT}" coder@localhost \
+        exec ssh -t -o StrictHostKeyChecking=no -i "${CLAUDE_KEY}" -p "${SSH_PORT}" coder@localhost \
             "bash -l -c 'cd /workspace && exec claude'"
     fi
 fi

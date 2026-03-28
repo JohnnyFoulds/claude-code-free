@@ -205,31 +205,17 @@ if (-not $model) {
 Ok "Model: $model"
 
 # ---------------------------------------------------------------------------
-# Step 3: SSH public key — use existing or generate one silently
+# Step 3: SSH public key — use dedicated passwordless key for claude-code-free
 # ---------------------------------------------------------------------------
 $sshDir = "$env:USERPROFILE\.ssh"
 New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
 
-$sshPubKey = ""
-$sshKeyPaths = @(
-    "$sshDir\id_ed25519.pub",
-    "$sshDir\id_rsa.pub"
-)
-foreach ($keyPath in $sshKeyPaths) {
-    if (Test-Path $keyPath) {
-        $sshPubKey = (Get-Content $keyPath -Raw).Trim()
-        break
-    }
+# Always use a dedicated key so we never rely on a user key that may have a passphrase.
+$claudeKeyPath = "$sshDir\id_ed25519_claude_code_free"
+if (-not (Test-Path "$claudeKeyPath.pub")) {
+    ssh-keygen -t ed25519 -f $claudeKeyPath -N "" -q 2>$null
 }
-
-if (-not $sshPubKey) {
-    Info "No SSH key found — generating one for passwordless access..."
-    ssh-keygen -t ed25519 -f "$sshDir\id_ed25519" -N "" -q 2>$null
-    if (Test-Path "$sshDir\id_ed25519.pub") {
-        $sshPubKey = (Get-Content "$sshDir\id_ed25519.pub" -Raw).Trim()
-        Ok "SSH key generated."
-    }
-}
+$sshPubKey = (Get-Content "$claudeKeyPath.pub" -Raw).Trim()
 
 # ---------------------------------------------------------------------------
 # Step 4: Workspace location
@@ -359,6 +345,7 @@ Host $SSH_CONFIG_HOST
     HostName localhost
     Port $SSH_PORT
     User coder
+    IdentityFile $claudeKeyPath
     StrictHostKeyChecking no
 "@
 
@@ -433,6 +420,6 @@ if ($tryNow -notmatch "^[Nn]") {
     } else {
         Write-Host "  Connecting... (type 'exit' to leave the container)"
         Write-Host ""
-        ssh -t -o StrictHostKeyChecking=no -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
+        ssh -t -o StrictHostKeyChecking=no -i $claudeKeyPath -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
     }
 }
