@@ -74,12 +74,35 @@ docker compose -f "$env:USERPROFILE\.claude-code-free\docker-compose.yml" down  
 
 ## Switching models
 
-Edit `~/.claude-code-free/docker-compose.yml` and change `ANTHROPIC_MODEL` to any model ID from [openrouter.ai/models](https://openrouter.ai/models). Many models are free or very cheap.
+The installer asks which model you want during setup. You can change it any time by editing `~/.claude-code-free/.env`:
+
+```
+OPENROUTER_MODEL=qwen/qwen3-coder:free
+```
 
 Then restart:
 ```bash
-docker compose -f ~/.claude-code-free/docker-compose.yml up -d
+docker compose -f ~/.claude-code-free/docker-compose.yml down
+docker compose --env-file ~/.claude-code-free/.env -f ~/.claude-code-free/docker-compose.yml up -d
 ```
+
+### Free models worth trying
+
+All of these work with a free OpenRouter account. No credit card needed.
+
+| Model ID | Size | Context | Good for |
+|---|---|---|---|
+| `stepfun/step-3.5-flash:free` | 196B MoE | 256K | **Default** — fast, well-rounded |
+| `qwen/qwen3-coder:free` | 480B MoE | 262K | Code generation, agentic coding |
+| `openai/gpt-oss-120b:free` | 120B MoE | 131K | Strong reasoning, complex tasks |
+| `openai/gpt-oss-20b:free` | 21B MoE | 131K | Faster, lighter version of above |
+| `meta-llama/llama-3.3-70b-instruct:free` | 70B | 65K | Solid all-rounder |
+| `nvidia/nemotron-3-super-120b-a12b:free` | 120B MoE | 262K | Complex reasoning |
+| `mistralai/mistral-small-3.1-24b-instruct:free` | 24B | 128K | Multimodal, fast |
+| `google/gemma-3-27b-it:free` | 27B | 131K | Google's largest Gemma 3 |
+| `nousresearch/hermes-3-llama-3.1-405b:free` | 405B | 131K | Large, agentic tasks |
+
+For the full up-to-date list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free)
 
 ## What's inside the container
 
