@@ -114,7 +114,7 @@ Full list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free)
 ```
 VS Code (your laptop)
     └── Remote SSH → localhost:2223
-            └── Docker container  (shambi/claude-code-free)
+            └── Docker container  (johannesfoulds/claude-code-free)
                     ├── Claude Code CLI
                     ├── Miniconda / Python
                     └── /workspace  ← your files live here

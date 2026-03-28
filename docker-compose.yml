@@ -1,6 +1,6 @@
 services:
   claude-code:
-    image: shambi/claude-code-free:latest
+    image: johannesfoulds/claude-code-free:latest
     container_name: claude-code-free
     ports:
       - "2223:22"
