@@ -148,6 +148,14 @@ Claude Code is built to work with any OpenAI-compatible API. This project points
 - **Free tier rate limits** — OpenRouter's free models have rate limits. If you hit them, wait a few minutes or switch to a different free model.
 - **Model availability** — free models can occasionally go offline on OpenRouter's side. If a model stops responding, try a different one from the list above.
 
+## A note on the free tier
+
+OpenRouter's free models are community-supported and subject to change. Rate limits, availability, and which models are offered at no cost can shift without notice.
+
+If you find yourself using this setup regularly, consider [adding credits to your OpenRouter account](https://openrouter.ai/settings/credits). Even a small balance unlocks higher rate limits and access to a much wider range of models — including stronger options that may suit your workflow better than any free-tier model currently available. OpenRouter's pricing is pay-as-you-go with no subscription required, and most models cost a fraction of a cent per request under normal coding use.
+
+The free tier is a good way to evaluate whether the setup works for you. Paid access is how you get reliable, production-quality results.
+
 ## Uninstall
 
 ### Uninstall on Mac / Linux
