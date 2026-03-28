@@ -11,8 +11,8 @@ $ErrorActionPreference = "Stop"
 
 $GITHUB_RAW   = "https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
 $INSTALL_DIR  = "$env:USERPROFILE\.claude-code-free"
-$SSH_PORT     = 2222
-$SSH_CONFIG_HOST = "claude-code"
+$SSH_PORT     = 2223
+$SSH_CONFIG_HOST = "claude-code-free"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -141,7 +141,7 @@ $envContent = "OPENROUTER_API_KEY=$apiKey`nSSH_AUTHORIZED_KEY=$sshPubKey"
 Set-Content -Path "$INSTALL_DIR\.env" -Value $envContent
 
 # Stop existing container if running
-$existing = docker ps -aq --filter "name=^claude-code$" 2>$null
+$existing = docker ps -aq --filter "name=^claude-code-free$" 2>$null
 if ($existing) {
     Info "Removing existing container..."
     docker compose -f "$INSTALL_DIR\docker-compose.yml" down 2>$null

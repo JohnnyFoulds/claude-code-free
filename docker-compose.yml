@@ -1,9 +1,9 @@
 services:
   claude-code:
     image: shambi/claude-code-free:latest
-    container_name: claude-code
+    container_name: claude-code-free
     ports:
-      - "2222:22"
+      - "2223:22"
     volumes:
       - workspace:/workspace
     environment:

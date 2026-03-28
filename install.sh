@@ -11,9 +11,9 @@ set -euo pipefail
 
 GITHUB_RAW="https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
 INSTALL_DIR="${HOME}/.claude-code-free"
-CONTAINER_NAME="claude-code"
-SSH_PORT=2222
-SSH_CONFIG_HOST="claude-code"
+CONTAINER_NAME="claude-code-free"
+SSH_PORT=2223
+SSH_CONFIG_HOST="claude-code-free"
 
 # ---------------------------------------------------------------------------
 # Colours
