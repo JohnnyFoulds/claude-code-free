@@ -275,6 +275,30 @@ fi
 ok "API key accepted."
 
 # ---------------------------------------------------------------------------
+# Step 2b: Model selection (optional)
+# ---------------------------------------------------------------------------
+DEFAULT_MODEL="stepfun/step-3.5-flash:free"
+MODEL=""
+if [ "${1:-}" = "--model" ]; then
+    MODEL="${2:-}"
+fi
+
+if [ -z "$MODEL" ]; then
+    echo ""
+    echo "  Default model: ${DEFAULT_MODEL}"
+    echo "  To use a different OpenRouter model, enter its ID below."
+    echo "  Press Enter to keep the default."
+    echo ""
+    read -r -p "  Model ID (or Enter for default): " MODEL
+fi
+
+if [ -z "$MODEL" ]; then
+    MODEL="$DEFAULT_MODEL"
+fi
+
+ok "Model: ${MODEL}"
+
+# ---------------------------------------------------------------------------
 # Step 3: SSH public key (optional, silent)
 # ---------------------------------------------------------------------------
 SSH_PUB_KEY=""
@@ -304,6 +328,7 @@ heading "Step 5: Starting container"
 
 cat > "${INSTALL_DIR}/.env" <<EOF
 OPENROUTER_API_KEY=${API_KEY}
+OPENROUTER_MODEL=${MODEL}
 SSH_AUTHORIZED_KEY=${SSH_PUB_KEY}
 EOF
 

@@ -185,6 +185,27 @@ if (-not $apiKey) {
 Ok "API key accepted."
 
 # ---------------------------------------------------------------------------
+# Step 2b: Model selection (optional)
+# ---------------------------------------------------------------------------
+$defaultModel = "stepfun/step-3.5-flash:free"
+$model = $env:OPENROUTER_MODEL
+
+if (-not $model) {
+    Write-Host ""
+    Write-Host "  Default model: $defaultModel"
+    Write-Host "  To use a different OpenRouter model, enter its ID below."
+    Write-Host "  Press Enter to keep the default."
+    Write-Host ""
+    $model = Read-Host "  Model ID (or Enter for default)"
+}
+
+if (-not $model) {
+    $model = $defaultModel
+}
+
+Ok "Model: $model"
+
+# ---------------------------------------------------------------------------
 # Step 3: SSH public key (optional, silent)
 # ---------------------------------------------------------------------------
 $sshPubKey = ""
@@ -213,7 +234,7 @@ Ok "Configuration downloaded to $INSTALL_DIR"
 # ---------------------------------------------------------------------------
 Heading "Step 5: Starting container"
 
-$envContent = "OPENROUTER_API_KEY=$apiKey`nSSH_AUTHORIZED_KEY=$sshPubKey"
+$envContent = "OPENROUTER_API_KEY=$apiKey`nOPENROUTER_MODEL=$model`nSSH_AUTHORIZED_KEY=$sshPubKey"
 Set-Content -Path "$INSTALL_DIR\.env" -Value $envContent
 
 # Stop existing container if running
