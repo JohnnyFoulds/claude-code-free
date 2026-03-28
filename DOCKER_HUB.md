@@ -1,8 +1,18 @@
 # johannesfoulds/claude-code-free
 
-Run [Claude Code](https://claude.ai/code) with free AI models via [OpenRouter](https://openrouter.ai) — no Anthropic subscription required.
+Run [Claude Code](https://claude.ai/code) in a container using free AI models via [OpenRouter](https://openrouter.ai) — no Anthropic subscription required.
 
-Full documentation and source: [github.com/JohnnyFoulds/claude-code-free](https://github.com/JohnnyFoulds/claude-code-free)
+**Maintained by:** [Johannes Foulds](https://github.com/JohnnyFoulds/claude-code-free)
+**Where to get help:** [GitHub Issues](https://github.com/JohnnyFoulds/claude-code-free/issues) · [Source repository](https://github.com/JohnnyFoulds/claude-code-free)
+**Supported architectures:** `amd64`
+
+---
+
+## Supported tags
+
+| Tag | Description |
+| --- | --- |
+| `latest` | Latest stable build — [Dockerfile](https://github.com/JohnnyFoulds/claude-code-free/blob/master/docker/Dockerfile) |
 
 ---
 
@@ -19,13 +29,16 @@ docker run -d \
   johannesfoulds/claude-code-free
 ```
 
-Then connect via SSH:
+Connect via SSH:
 
 ```bash
 ssh -p 2223 coder@localhost
+# password: coder
 ```
 
-Password: `coder` (for initial access — inject a public key via `SSH_AUTHORIZED_KEY` for normal use).
+Get a free OpenRouter API key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys).
+
+> **Note:** Free-tier models are community-supported and subject to rate limits. For higher throughput, [add credits](https://openrouter.ai/settings/credits) to your OpenRouter account or switch to a paid model.
 
 ---
 
@@ -34,10 +47,19 @@ Password: `coder` (for initial access — inject a public key via `SSH_AUTHORIZE
 | Variable | Required | Description |
 | --- | --- | --- |
 | `ANTHROPIC_BASE_URL` | Yes | API base URL. Set to `https://openrouter.ai/api` for OpenRouter. |
-| `ANTHROPIC_AUTH_TOKEN` | Yes | Your OpenRouter API key. Get one free at [openrouter.ai](https://openrouter.ai). |
-| `ANTHROPIC_MODEL` | Yes | Model ID to use. See the models table below. |
+| `ANTHROPIC_AUTH_TOKEN` | Yes | Your OpenRouter API key. |
+| `ANTHROPIC_MODEL` | Yes | Model ID. See [Models](#models) below. |
 | `ANTHROPIC_API_KEY` | No | Alternative to `ANTHROPIC_AUTH_TOKEN`. Either works. |
-| `SSH_AUTHORIZED_KEY` | No | Public key injected into `/home/coder/.ssh/authorized_keys` at startup. Recommended over password auth. |
+| `SSH_AUTHORIZED_KEY` | No | Public key written to `/home/coder/.ssh/authorized_keys` at startup. Recommended over password auth. |
+
+### Using Docker Secrets
+
+Sensitive values can be injected via the `_FILE` suffix convention. The entrypoint reads the file path and exports the value:
+
+```bash
+# Example — inject API key from a Docker secret
+-e ANTHROPIC_AUTH_TOKEN_FILE=/run/secrets/openrouter_key
+```
 
 ---
 
@@ -45,7 +67,7 @@ Password: `coder` (for initial access — inject a public key via `SSH_AUTHORIZE
 
 | Mount path | Purpose |
 | --- | --- |
-| `/workspace` | Your project files. Persist this across container restarts. |
+| `/workspace` | Your project files. Persist this volume across container restarts. |
 
 ```bash
 # Named volume (recommended)
@@ -67,16 +89,16 @@ Password: `coder` (for initial access — inject a public key via `SSH_AUTHORIZE
 
 ## Using with VS Code Remote SSH
 
-Add this to your `~/.ssh/config`:
+Add to `~/.ssh/config`:
 
-```
+```sshconfig
 Host claude-code-free
     HostName localhost
     Port 2223
     User coder
 ```
 
-Then connect from VS Code: `Cmd+Shift+P` → `Remote-SSH: Connect to Host` → `claude-code-free`.
+Then connect: `Cmd+Shift+P` → `Remote-SSH: Connect to Host` → `claude-code-free`.
 
 ---
 
@@ -105,8 +127,6 @@ volumes:
 
 ## Injecting an SSH public key
 
-Pass your public key via the `SSH_AUTHORIZED_KEY` environment variable:
-
 ```bash
 docker run -d \
   -e SSH_AUTHORIZED_KEY="$(cat ~/.ssh/id_ed25519.pub)" \
@@ -120,7 +140,7 @@ Or mount a Kubernetes ConfigMap at `/root/ssh-keys/authorized_keys`.
 
 ## Models
 
-Set `ANTHROPIC_MODEL` to any OpenRouter model ID. Free models are available at no cost subject to rate limits.
+Set `ANTHROPIC_MODEL` to any OpenRouter model ID. Free models are subject to rate limits and availability.
 
 | Model | Context | Notes |
 | --- | --- | --- |
@@ -133,8 +153,6 @@ Set `ANTHROPIC_MODEL` to any OpenRouter model ID. Free models are available at n
 | `mistralai/mistral-small-3.1-24b-instruct:free` | 128K | Fast, multimodal |
 
 Full list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free)
-
-> Free tier models are community-supported and subject to rate limits and availability changes. Consider [adding credits](https://openrouter.ai/settings/credits) to your OpenRouter account for higher limits and access to paid models.
 
 ---
 
@@ -149,6 +167,24 @@ Full list: [openrouter.ai/models?q=free](https://openrouter.ai/models?q=free)
 | Web access | `w3m`, `curl`, `markdownify` |
 | SSH server | OpenSSH |
 | User | `coder` (non-root, passwordless sudo) |
+
+---
+
+## Updating
+
+Pull the latest image and recreate the container:
+
+```bash
+docker pull johannesfoulds/claude-code-free:latest
+docker stop claude-code-free && docker rm claude-code-free
+# re-run your original docker run command
+```
+
+With Docker Compose:
+
+```bash
+docker compose pull && docker compose up -d
+```
 
 ---
 

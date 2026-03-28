@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 
 $GITHUB_RAW      = "https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main"
 $INSTALL_DIR     = "$env:USERPROFILE\.claude-code-free"
+$CONTAINER_NAME  = "claude-code-free"
 $SSH_PORT        = 2223
 $SSH_CONFIG_HOST = "claude-code-free"
 
@@ -59,7 +60,7 @@ Write-Host "  Claude Code - Free AI Coding Assistant" -ForegroundColor Cyan
 Write-Host "  Powered by Step-3.5-Flash via OpenRouter (free tier)"
 Write-Host ""
 Write-Host "  This script will:"
-Write-Host "    1. Install Docker Desktop if needed, or start it if not running"
+Write-Host "    1. Install Docker if needed, or start it if not running"
 Write-Host "    2. Ask for your free OpenRouter API key"
 Write-Host "    3. Download and start the Claude Code container"
 Write-Host "    4. Configure VS Code Remote SSH"
@@ -238,14 +239,14 @@ $envContent = "OPENROUTER_API_KEY=$apiKey`nOPENROUTER_MODEL=$model`nSSH_AUTHORIZ
 Set-Content -Path "$INSTALL_DIR\.env" -Value $envContent
 
 # Stop existing container if running
-$existing = docker ps -aq --filter "name=^claude-code-free$" 2>$null
+$existing = docker ps -aq --filter "name=^${CONTAINER_NAME}$" 2>$null
 if ($existing) {
     Info "Removing existing container..."
     docker compose -f "$INSTALL_DIR\docker-compose.yml" down 2>$null
 }
 
 Info "Pulling and starting Claude Code container..."
-Info "(First run downloads ~1 GB — takes about 1-2 minutes)"
+Info "(First run downloads ~140 MB — takes about 1-2 minutes)"
 Write-Host ""
 docker compose --env-file "$INSTALL_DIR\.env" -f "$INSTALL_DIR\docker-compose.yml" up -d --pull always
 Write-Host ""
@@ -289,19 +290,35 @@ Heading "All done"
 
 Write-Host "  Claude Code is running and ready."
 Write-Host ""
-Write-Host "  Connect from VS Code:"
-Write-Host "    1. Install the 'Remote - SSH' extension (if not already installed)"
-Write-Host "    2. Press Ctrl+Shift+P"
-Write-Host "    3. Type:   Remote-SSH: Connect to Host"
-Write-Host "    4. Select: $SSH_CONFIG_HOST"
+Write-Host "  ── SSH access ──────────────────────────────────────────────────"
+Write-Host "  Direct SSH:"
+Write-Host "    ssh -p $SSH_PORT coder@localhost"
 if (-not $sshPubKey) {
-    Write-Host "    5. Password: coder"
+    Write-Host "    Password: coder"
 }
 Write-Host ""
-Write-Host "  Once connected, open a VS Code terminal and run:"
+Write-Host "  ── VS Code Remote SSH ──────────────────────────────────────────"
+Write-Host "  1. Install the 'Remote - SSH' extension (if not already installed)"
+Write-Host "  2. Press Ctrl+Shift+P"
+Write-Host "  3. Type:   Remote-SSH: Connect to Host"
+Write-Host "  4. Select: $SSH_CONFIG_HOST"
+if (-not $sshPubKey) {
+    Write-Host "  5. Password: coder"
+}
+Write-Host ""
+Write-Host "  ── Once inside the container ───────────────────────────────────"
 Write-Host "    cd /workspace"
 Write-Host "    claude"
 Write-Host ""
-Write-Host "  To stop:    docker compose -f $INSTALL_DIR\docker-compose.yml down"
-Write-Host "  To restart: docker compose -f $INSTALL_DIR\docker-compose.yml up -d"
+Write-Host "  ── Daily commands ──────────────────────────────────────────────"
+Write-Host "  Stop:    docker compose -f $INSTALL_DIR\docker-compose.yml down"
+Write-Host "  Start:   docker compose -f $INSTALL_DIR\docker-compose.yml up -d"
 Write-Host ""
+
+$tryNow = Read-Host "  Try Claude Code right now? [Y/n]"
+if ($tryNow -notmatch "^[Nn]") {
+    Write-Host ""
+    Write-Host "  Connecting... (type 'exit' to leave the container)"
+    Write-Host ""
+    ssh -t -o StrictHostKeyChecking=no -p $SSH_PORT coder@localhost "bash -l -c 'cd /workspace && exec claude'"
+}

@@ -336,7 +336,7 @@ if docker ps -aq --filter "name=^${CONTAINER_NAME}$" | grep -q .; then
 fi
 
 info "Pulling and starting Claude Code container..."
-info "(First run downloads ~1 GB — takes about 1-2 minutes)"
+info "(First run downloads ~140 MB — takes about 1-2 minutes)"
 echo ""
 docker compose --env-file "${INSTALL_DIR}/.env" -f "${INSTALL_DIR}/docker-compose.yml" up -d --pull always
 echo ""
