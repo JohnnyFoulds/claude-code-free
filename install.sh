@@ -61,7 +61,9 @@ echo "    5. Configure VS Code Remote SSH"
 echo ""
 echo "  Takes about 2-5 minutes on first run."
 echo ""
-if [ "$PIPED" = false ]; then
+if [ "$PIPED" = true ]; then
+    read -r -p "  Press Enter to continue, or Ctrl-C to cancel... " </dev/tty
+else
     read -r -p "  Press Enter to continue, or Ctrl-C to cancel... "
 fi
 
@@ -312,12 +314,14 @@ DEFAULT_MODEL="stepfun/step-3.5-flash:free"
 MODEL="${OPENROUTER_MODEL:-}"
 
 if [ -z "$MODEL" ]; then
-    if [ "$PIPED" = false ]; then
-        echo ""
-        echo "  Default model: ${DEFAULT_MODEL}"
-        echo "  To use a different OpenRouter model, enter its ID below."
-        echo "  Press Enter to keep the default."
-        echo ""
+    echo ""
+    echo "  Default model: ${DEFAULT_MODEL}"
+    echo "  To use a different OpenRouter model, enter its ID below."
+    echo "  Press Enter to keep the default."
+    echo ""
+    if [ "$PIPED" = true ]; then
+        read -r -p "  Model ID (or Enter for default): " MODEL </dev/tty
+    else
         read -r -p "  Model ID (or Enter for default): " MODEL
     fi
 fi
@@ -352,73 +356,76 @@ WORKSPACE_VOLUME=""   # compose volume line
 WORKSPACE_VOLUMES=""  # compose top-level volumes block (only for named volume)
 WORKSPACE_DISPLAY=""  # shown to user in summary
 
-if [ "$PIPED" = true ]; then
-    # Use default workspace when piped — no interactive selection possible
-    WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
-    mkdir -p "${WORKSPACE_PATH}"
-    WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
-    WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
-    ok "Workspace: ${WORKSPACE_PATH} (default)"
-else
-    echo "  Where should your workspace files be stored?"
-    echo ""
-    echo "  [1] ${DEFAULT_WORKSPACE}  (recommended)"
-    echo "      Files saved here are visible in Finder/file manager and easy to back up."
-    echo ""
-    echo "  [2] Docker volume  (managed by Docker, not directly visible)"
-    echo "      Use this if you only access files via VS Code Remote SSH."
-    echo ""
-    echo "  [3] Custom path"
-    echo "      Enter any directory on this machine."
-    echo ""
+echo "  Where should your workspace files be stored?"
+echo ""
+echo "  [1] ${DEFAULT_WORKSPACE}  (recommended)"
+echo "      Files saved here are visible in Finder/file manager and easy to back up."
+echo ""
+echo "  [2] Docker volume  (managed by Docker, not directly visible)"
+echo "      Use this if you only access files via VS Code Remote SSH."
+echo ""
+echo "  [3] Custom path"
+echo "      Enter any directory on this machine."
+echo ""
 
-    WORKSPACE_TYPE=""
-    while true; do
+WORKSPACE_TYPE=""
+while true; do
+    if [ "$PIPED" = true ]; then
+        read -r -p "  Choose [1/2/3] (default: 1): " WORKSPACE_TYPE </dev/tty
+    else
         read -r -p "  Choose [1/2/3] (default: 1): " WORKSPACE_TYPE
-        WORKSPACE_TYPE="${WORKSPACE_TYPE:-1}"
-        case "$WORKSPACE_TYPE" in
-            1|2|3) break ;;
-            *) warn "Please enter 1, 2, or 3." ;;
-        esac
-    done
-
+    fi
+    WORKSPACE_TYPE="${WORKSPACE_TYPE:-1}"
     case "$WORKSPACE_TYPE" in
-        1)
-            WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
-            mkdir -p "${WORKSPACE_PATH}"
-            WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
-            WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
-            ok "Workspace: ${WORKSPACE_PATH}"
-            ;;
-        2)
-            WORKSPACE_VOLUME="      - workspace:/workspace"
-            WORKSPACE_VOLUMES="
+        1|2|3) break ;;
+        *) warn "Please enter 1, 2, or 3." ;;
+    esac
+done
+
+case "$WORKSPACE_TYPE" in
+    1)
+        WORKSPACE_PATH="${DEFAULT_WORKSPACE}"
+        mkdir -p "${WORKSPACE_PATH}"
+        WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+        WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+        ok "Workspace: ${WORKSPACE_PATH}"
+        ;;
+    2)
+        WORKSPACE_VOLUME="      - workspace:/workspace"
+        WORKSPACE_VOLUMES="
 volumes:
   workspace:"
-            WORKSPACE_DISPLAY="Docker volume (docker volume inspect claude-workspace to locate)"
-            ok "Workspace: Docker named volume"
-            ;;
-        3)
-            while true; do
+        WORKSPACE_DISPLAY="Docker volume (docker volume inspect claude-workspace to locate)"
+        ok "Workspace: Docker named volume"
+        ;;
+    3)
+        while true; do
+            if [ "$PIPED" = true ]; then
+                read -r -p "  Enter full path (e.g. /home/you/projects): " WORKSPACE_PATH </dev/tty
+            else
                 read -r -p "  Enter full path (e.g. /home/you/projects): " WORKSPACE_PATH
-                if [ -z "$WORKSPACE_PATH" ]; then
-                    warn "Path cannot be empty."
-                elif [ -d "$WORKSPACE_PATH" ]; then
-                    break
+            fi
+            if [ -z "$WORKSPACE_PATH" ]; then
+                warn "Path cannot be empty."
+            elif [ -d "$WORKSPACE_PATH" ]; then
+                break
+            else
+                if [ "$PIPED" = true ]; then
+                    read -r -p "  Directory does not exist. Create it? [Y/n] " create_it </dev/tty
                 else
                     read -r -p "  Directory does not exist. Create it? [Y/n] " create_it
-                    if [[ "$create_it" != "n" && "$create_it" != "N" ]]; then
-                        mkdir -p "$WORKSPACE_PATH"
-                        break
-                    fi
                 fi
-            done
-            WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
-            WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
-            ok "Workspace: ${WORKSPACE_PATH}"
-            ;;
-    esac
-fi
+                if [[ "$create_it" != "n" && "$create_it" != "N" ]]; then
+                    mkdir -p "$WORKSPACE_PATH"
+                    break
+                fi
+            fi
+        done
+        WORKSPACE_VOLUME="      - ${WORKSPACE_PATH}:/workspace"
+        WORKSPACE_DISPLAY="${WORKSPACE_PATH}"
+        ok "Workspace: ${WORKSPACE_PATH}"
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Step 5: Write docker-compose.yml and .env, start container
