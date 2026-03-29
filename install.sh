@@ -492,9 +492,13 @@ mkdir -p "${HOME}/.ssh"
 SSH_CONFIG="${HOME}/.ssh/config"
 
 if grep -q "Host ${SSH_CONFIG_HOST}" "${SSH_CONFIG}" 2>/dev/null; then
-    # Remove existing block and replace with updated entry
-    perl -i -0pe "s/\n?Host ${SSH_CONFIG_HOST}\b.*?(?=\nHost |\z)//s" "${SSH_CONFIG}" 2>/dev/null || \
-        sed -i "/^Host ${SSH_CONFIG_HOST}/,/^Host /{ /^Host ${SSH_CONFIG_HOST}/d; /^Host /!d; }" "${SSH_CONFIG}"
+    # Remove existing block and replace with updated entry.
+    # perl is available on macOS and all major Linux distros; no fallback needed.
+    if ! perl -i -0pe "s/\n?Host ${SSH_CONFIG_HOST}\b.*?(?=\nHost |\z)//s" "${SSH_CONFIG}" 2>/dev/null; then
+        warn "Could not update existing SSH config entry (perl not found)."
+        warn "Remove the '${SSH_CONFIG_HOST}' block from ${SSH_CONFIG} manually, then re-run."
+        exit 1
+    fi
 fi
 cat >> "${SSH_CONFIG}" <<EOF
 
