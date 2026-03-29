@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets
+.env
+.env.local
+*.env
+
+# Docker
+docker/.env.local
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
