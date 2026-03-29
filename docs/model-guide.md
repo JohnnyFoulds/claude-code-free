@@ -223,7 +223,7 @@ The full list of OpenRouter models is at [openrouter.ai/models](https://openrout
 
 ## Sources
 
-All benchmark figures are from official model cards or peer-reviewed technical reports accessed in March 2026. Rate limit and pricing data is from OpenRouter model pages. Community observations are from HackerNews discussions. Full bibliography in the [internal research notes](../../research/openrouter-model-review/README.md).
+All benchmark figures are from official model cards or peer-reviewed technical reports accessed in March 2026. Rate limit and pricing data is from OpenRouter model pages. Community observations are from HackerNews discussions. Full bibliography in internal research notes.
 
 Key sources:
 - StepFun Step-3.5-Flash model card: huggingface.co/stepfun-ai/Step-3.5-Flash
