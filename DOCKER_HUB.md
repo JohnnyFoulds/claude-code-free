@@ -6,7 +6,7 @@ A full AI pair programmer in VS Code, running locally in a container, connected 
 
 **Maintained by:** [Johannes Foulds](https://github.com/JohnnyFoulds/claude-code-free)
 **Where to get help:** [GitHub Issues](https://github.com/JohnnyFoulds/claude-code-free/issues) · [Source repository](https://github.com/JohnnyFoulds/claude-code-free)
-**Supported architectures:** `amd64`
+**Supported architectures:** `amd64`, `arm64`
 
 ---
 
