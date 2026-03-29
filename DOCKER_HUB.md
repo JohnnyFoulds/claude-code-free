@@ -14,7 +14,7 @@ A full AI pair programmer in VS Code, running locally in a container, connected 
 
 | Tag | Description |
 | --- | --- |
-| `latest` | Latest stable build — [Dockerfile](https://github.com/JohnnyFoulds/claude-code-free/blob/master/docker/Dockerfile) |
+| `latest` | Latest stable build — [Dockerfile](https://github.com/JohnnyFoulds/claude-code-free/blob/main/docker/Dockerfile) |
 
 ---
 
