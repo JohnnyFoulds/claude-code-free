@@ -8,6 +8,8 @@ A full AI pair programmer in VS Code, running locally in a container, connected 
 
 This is [Claude Code](https://claude.ai/code) — Anthropic's own coding agent — running against free models via [OpenRouter](https://openrouter.ai). No Anthropic subscription. No credit card. One free API key and one command.
 
+![Claude Code Free demo](docs/demo.gif)
+
 ---
 
 ## Install
