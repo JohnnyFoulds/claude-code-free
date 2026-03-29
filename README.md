@@ -39,6 +39,8 @@ claude
 
 Your `/workspace` directory persists across container restarts. You can also connect via SSH directly:
 
+> **Note:** Claude Code runs in `bypassPermissions` mode inside this container — it will not prompt before reading, writing, or deleting files. This is intentional for a development container where you control the workspace. Do not mount directories you are not comfortable giving Claude Code full access to.
+
 ```bash
 ssh -p 2223 coder@localhost
 ```

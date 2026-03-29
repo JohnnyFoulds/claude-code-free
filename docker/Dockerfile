@@ -24,13 +24,14 @@ RUN npm install -g @anthropic-ai/claude-code
 # ---------------------------------------------------------------------------
 # SSH server setup
 # ---------------------------------------------------------------------------
-RUN ssh-keygen -A \
-    && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config \
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config \
     && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config \
     && sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
     && echo "AllowTcpForwarding yes" >> /etc/ssh/sshd_config \
     && echo "X11Forwarding no" >> /etc/ssh/sshd_config \
     && mkdir -p /run/sshd
+# SSH host keys are NOT generated here — they are generated at first container start
+# by entrypoint.sh so each container instance has unique keys.
 
 # ---------------------------------------------------------------------------
 # Non-root user for VS Code Remote SSH

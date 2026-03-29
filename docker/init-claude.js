@@ -5,6 +5,7 @@ const modulePaths = [
     '/usr/lib/node_modules/@anthropic-ai/claude-code/package.json'
 ];
 const pkgPath = modulePaths.find(p => { try { require.resolve(p); return true; } catch { return false; } });
+if (!pkgPath) throw new Error('Could not find @anthropic-ai/claude-code package.json in known paths');
 const v = require(pkgPath).version;
 
 // ~/.claude.json — user state (onboarding, trust)

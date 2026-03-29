@@ -17,7 +17,8 @@ fi
         fi
     done
 } > /etc/claude-code-env
-chmod 644 /etc/claude-code-env
+chmod 640 /etc/claude-code-env
+chown root:coder /etc/claude-code-env
 
 # SSH_AUTHORIZED_KEY env var: inject directly (docker run -e)
 if [ -n "${SSH_AUTHORIZED_KEY:-}" ]; then
