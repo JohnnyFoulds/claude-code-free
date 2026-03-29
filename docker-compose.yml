@@ -9,7 +9,7 @@ services:
     environment:
       - ANTHROPIC_BASE_URL=https://openrouter.ai/api
       - ANTHROPIC_AUTH_TOKEN=${OPENROUTER_API_KEY}
-      - ANTHROPIC_API_KEY=
+      - ANTHROPIC_API_KEY=  # explicitly cleared so Claude Code uses ANTHROPIC_AUTH_TOKEN above
       - ANTHROPIC_MODEL=${OPENROUTER_MODEL:-stepfun/step-3.5-flash:free}
       - SSH_AUTHORIZED_KEY=${SSH_AUTHORIZED_KEY:-}
     restart: unless-stopped
