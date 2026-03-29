@@ -7,7 +7,7 @@ apply the same technique to any project.
 
 ## What this produces
 
-An animated SVG embedded in the README that plays automatically on GitHub,
+An animated GIF embedded in the README that plays automatically on GitHub,
 showing the complete install-to-running flow:
 
 1. User types `curl ... | bash`
@@ -21,252 +21,242 @@ No human typing required. One command produces a perfect take every time.
 
 ## How it works
 
-Three tools form the pipeline:
+Four tools form the pipeline:
 
 ```
-expect  →  drives the terminal session (types, waits, responds)
+kitty remote control  →  drives a real TTY terminal (keystrokes sent via unix socket)
     ↓
-asciinema  →  records every character and its timing
+asciinema             →  records every character and its timing inside that terminal
     ↓
-svg-term  →  renders the recording as an animated SVG
+cast-v3-to-v2.py      →  converts asciinema v3 format to v2 (required by agg)
+    ↓
+agg                   →  renders the cast as an animated GIF
 ```
 
-### expect
+### Why kitty remote control
 
-`expect` is a scripting tool (Tcl-based, ships with macOS) designed to drive
-interactive terminal programs. You write a script that:
+The fundamental problem with every other approach is **headless timing collapse**.
+When `asciinema rec --command "..."` runs without a real TTY, all timing information
+is lost — the entire recording plays back at machine speed regardless of any `sleep`
+or `after` delays in the script. A 3-minute install collapses to 10 seconds.
 
-- `spawn`s a process (a shell, an SSH session, any interactive program)
-- `expect`s specific output to appear before continuing
-- `send`s keystrokes in response
+kitty solves this because:
 
-The `type_slowly` helper in `record.exp` sends one character at a time with
-a configurable delay, producing realistic human-looking typing in the recording.
+- asciinema runs inside a real kitty window with a real TTY
+- the recording script sends keystrokes via `kitty @ send-text` from outside
+- all `sleep` delays are honoured — the recording has natural timing
+- no human needs to touch the keyboard
 
-### asciinema
+### Why agg instead of svg-term
 
-Records a terminal session to a `.cast` file (JSON lines, one per output event,
-with timestamps). The `--command` flag runs a specific command instead of an
-interactive shell — here, it runs the `expect` script.
+`svg-term` was the obvious first choice but has two fatal problems:
 
-**Important:** asciinema 3.x records in v3 format. `svg-term` only supports v2.
-Always convert: `asciinema convert -f asciicast-v2 input.cast output.cast`
+- It bakes every frame into an inline SVG — runs out of memory (JavaScript heap OOM)
+  on recordings with more than ~1000 events. A real install recording has 8000+ events.
+- It produces blurry text because SVG scales inline text elements rather than rendering
+  at native resolution.
 
-**Important:** asciinema in headless mode (no TTY) collapses all timing — every
-`after` delay in the expect script is ignored and the recording plays out at
-machine speed (~10 seconds for a 3-minute install). The fix is to run the
-recording in a real terminal session, not via a non-interactive shell.
-See "Known issues" below.
-
-### svg-term
-
-Converts an asciicast v2 file to an animated SVG using CSS keyframe animations.
-The SVG plays inline on GitHub, is crisp at any resolution, and has no
-JavaScript dependency. The `--window` flag adds the macOS traffic-light chrome.
+`agg` is asciinema's own Rust-based renderer. It produces proper animated GIFs at
+native resolution with no OOM risk regardless of recording length.
 
 ---
 
-## Prerequisites
+## One-time setup
 
-Install once:
+### 1. Install tools
 
 ```bash
-brew install expect asciinema
-npm install -g svg-term-cli
+brew install asciinema agg
 ```
 
-Versions confirmed working:
+Versions confirmed working on macOS (Apple Silicon):
 
 | Tool | Version |
 | --- | --- |
-| expect | 5.45 (ships with macOS) |
+| kitty | 0.46.1 |
 | asciinema | 3.2.0 |
-| svg-term-cli | 2.1.1 |
-| Node.js | 25.x (svg-term requirement) |
+| agg | 1.7.0 |
 
----
+`kitty` ships with macOS app bundle at `/Applications/kitty.app`. No brew install needed.
 
-## Files in this directory
+**Do not install svg-term-cli** — it is the wrong tool and will OOM on real recordings.
 
-| File | Purpose |
-| --- | --- |
-| `record.sh` | One-command wrapper: reset → record → convert → render → open |
-| `record.exp` | The expect script that drives the full session |
-| `demo.svg` | Output — the animated SVG for the README (generated, not hand-edited) |
+### 2. Enable kitty remote control
+
+Edit `~/.config/kitty/kitty.conf` and add these two lines at the top:
+
+```ini
+allow_remote_control yes
+listen_on unix:/tmp/kitty.sock
+```
+
+**Important:** `listen_on` only takes effect on startup — a config reload (`Ctrl+Shift+F5`)
+does nothing. You must fully quit and restart kitty.
+
+**Important:** kitty appends its PID to the socket path, so the actual socket will be
+`/tmp/kitty.sock-<PID>`, not `/tmp/kitty.sock`. The recording script discovers it
+automatically with `ls /tmp/kitty.sock-*`.
+
+### 3. Verify remote control works
+
+After restarting kitty, run this from any other terminal (including inside Claude Code):
+
+```bash
+SOCK=$(ls /tmp/kitty.sock-* | head -1)
+kitty @ --to "unix:${SOCK}" send-text "echo hello from outside\r"
+```
+
+You should see `echo hello from outside` appear and execute in the kitty window.
+
+If you see `Error: Remote control is disabled` — kitty did not fully restart.
+Use `pkill -x kitty` to force-kill it, then reopen from the Dock or Spotlight.
+
+If you see `Error: Failed to connect ... no such file or directory` — the socket path
+is wrong. Run `ls /tmp/kitty.sock-*` to find the actual path.
 
 ---
 
 ## Usage
 
+Open kitty. Then from any terminal (including Claude Code's shell):
+
 ```bash
-OPENROUTER_KEY=sk-or-v1-your-key bash docs/record.sh
+OPENROUTER_KEY=sk-or-v1-your-key bash docs/record-kitty.sh
 ```
 
 The script:
 
-1. Stops and removes any existing `claude-code-free` container
-2. Deletes `~/.claude-code-free` (install config)
-3. Clears the `[localhost]:2223` known_hosts entry
-4. Records the session via `expect` into `/tmp/claude-code-free-demo.cast`
-5. Converts to asciicast v2
-6. Renders to `docs/demo.svg`
-7. Opens the SVG in your browser
-
-Review the SVG. If it looks good, add it to the README:
-
-```bash
-git add docs/demo.svg README.md
-git commit -m "docs: add animated demo"
-git push origin main
-```
+1. Finds the kitty socket automatically (`/tmp/kitty.sock-<PID>`)
+2. Stops and removes any existing `claude-code-free` container
+3. Deletes `~/.claude-code-free` (install config)
+4. Clears the `[localhost]:2223` known_hosts entry
+5. Sets a clean `$` prompt and clears the screen inside kitty
+6. Starts `asciinema rec` inside the kitty window
+7. Types the curl command, responds to every prompt, types the demo question
+8. Waits for Claude's response, then exits cleanly
+9. Converts the cast from asciinema v3 to v2 format
+10. Renders `docs/demo.gif` with `agg`
+11. Opens the GIF for review
 
 ---
 
-## Tuning the recording
+## Files
 
-All timing is controlled by constants at the top of `record.exp`:
+| File | Purpose |
+| --- | --- |
+| `record-kitty.sh` | Main script — does everything from reset to rendered GIF |
+| `cast-v3-to-v2.py` | Converts asciinema v3 cast to v2 format |
+| `demo-reset.sh` | Standalone reset — clean docker + clean shell, for manual recording |
+| `record.exp` | Legacy expect script (kept for reference — headless timing problem applies) |
+| `record.sh` | Legacy shell wrapper for expect (kept for reference) |
+| `demo.gif` | Output — the animated GIF for the README |
 
-| Constant | Default | Effect |
+---
+
+## Tuning
+
+All timing is controlled by env vars:
+
+| Variable | Default | Effect |
 | --- | --- | --- |
-| `CHAR_DELAY` | 80ms | Delay between each character typed |
-| `WORD_PAUSE` | 120ms | Extra pause after each space (between words) |
-| `PROMPT_PAUSE` | 1200ms | Pause before responding to a prompt (looks like the user is reading) |
+| `CHAR_DELAY_MS` | 80 | Milliseconds between each typed character |
+| `WORD_PAUSE_MS` | 120 | Extra milliseconds after each space |
+| `PROMPT_PAUSE_MS` | 2000 | Pause before responding to a prompt |
 
-To make typing faster: lower `CHAR_DELAY`. To make it slower: raise it.
-To shorten pauses at prompts: lower `PROMPT_PAUSE`.
+```bash
+OPENROUTER_KEY=sk-or-v1-... CHAR_DELAY_MS=50 PROMPT_PAUSE_MS=1500 bash docs/record-kitty.sh
+```
 
-After changing `record.exp`, re-run `record.sh` to get a new take.
+agg rendering options (edit the `agg` call in `record-kitty.sh`):
+
+| Flag | Effect |
+| --- | --- |
+| `--speed 1.5` | Play back 50% faster |
+| `--idle-time-limit 3` | Cap any gap between events at 3s (default) — prevents long pauses |
+| `--font-size 14` | Font size in the output GIF |
 
 ---
 
 ## The API key problem
 
-The expect script types the OpenRouter API key character by character.
-This means the real key appears in the SVG recording — visible to anyone who
-views it on GitHub.
+The script types the OpenRouter API key character by character. The real key will
+appear in the GIF — visible to anyone who views it on GitHub.
 
 Options:
 
 1. **Use a throwaway key** — create a free OpenRouter key just for the recording,
-   revoke it after. The recording will show a real-looking key that no longer works.
+   revoke it afterwards. The GIF shows a real-looking key that no longer works.
 
-2. **Use a fake key** — change `set API_KEY $env(OPENROUTER_KEY)` in `record.exp`
-   to `set API_KEY "sk-or-v1-xxxxxxxxxxxxxxxxxxxx"` and type that instead.
-   The install will fail at the API call, but for a recording that only needs to
-   show the install flow up to the container starting, this is sufficient.
-   Claude Code's actual response requires a real key.
-
-3. **Speed through the key** — set `CHAR_DELAY 5` only for the key line so it
-   types too fast to read, then restore normal speed. Less clean but functional.
+2. **Speed through the key** — set `CHAR_DELAY_MS=5` so it types too fast to read.
+   The rest of the demo runs at normal speed.
 
 ---
 
-## Known issues
+## Known issues and hard-won lessons
 
-### Headless mode collapses timing
+### `listen_on` requires a full restart
 
-When `asciinema rec --command "expect ..."` runs without a real TTY (e.g. from
-Claude Code's shell, a CI environment, or any non-interactive context),
-asciinema records in "headless mode". In this mode, all `after` delays in the
-expect script are ignored — the session completes in ~10 seconds regardless of
-what delays are set.
+`kitty --reload-config` and `Ctrl+Shift+F5` do **not** apply `listen_on` changes.
+The socket is only created when the kitty process starts. You must `pkill -x kitty`
+and reopen the app.
 
-**Symptom:** The cast file shows `Total duration: 10.0s` for a session that
-should take 3-4 minutes. The SVG plays back at machine speed.
+### Socket has PID suffix
 
-**Root cause:** In headless mode, asciinema connects its own pseudo-TTY to the
-command. The expect script's `after` calls still run, but asciinema timestamps
-events relative to real wall-clock time — and without a human on the other end,
-the shell processes output instantly.
+The configured path `unix:/tmp/kitty.sock` becomes `unix:/tmp/kitty.sock-<PID>` at
+runtime. This is by design (allows multiple kitty instances). The recording script
+handles this automatically — do not hardcode the socket path.
 
-**Fix:** Record from a real interactive terminal session. Open a terminal
-window (iTerm2, Terminal.app), set `OPENROUTER_KEY`, and run:
+### svg-term OOM
+
+`svg-term-cli` is not suitable for recordings longer than ~30 seconds. It will crash
+with `FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory`
+on any real install recording. Use `agg`.
+
+### asciinema v3 vs v2
+
+asciinema 3.x records in v3 format where event timestamps are **relative** (offset
+from previous event). Both `agg` and `svg-term` require v2 format where timestamps
+are **absolute** (seconds since start). Always run `cast-v3-to-v2.py` before rendering.
+
+### Fancy zsh prompt in the recording
+
+If your zsh uses Powerlevel10k or oh-my-zsh with Nerd Font glyphs, those glyphs render
+as broken boxes in the output GIF because the renderer does not have the font. The
+recording script works around this by switching to a clean bash shell before starting
+asciinema:
 
 ```bash
-asciinema rec /tmp/demo.cast --cols 110 --rows 30 --command "expect docs/record.exp"
+exec env -i HOME="$HOME" TERM=xterm-256color PATH="$PATH" bash --norc --noprofile
+PS1='$ '
 ```
 
-In an interactive terminal, `expect` runs with a real TTY attached and all
-`after` delays are honoured. The recording will have natural timing.
+This replaces the current shell with a clean bash that has no rc files, no conda prefix,
+no Powerlevel10k, and no fancy prompt — just `$`.
 
-**Workaround (post-processing):** If you already have a fast recording, the
-timing can be artificially stretched using the trim script in `recording-script.md`.
-This inflates gaps but does not add natural per-character timing — it looks less
-convincing than a real recording.
+### GIF file size
 
-### Platform warning in container output
+`agg` GIFs can be 5–20 MB for a 3-minute recording. GitHub supports animated GIFs
+up to 25 MB in READMEs. If the file is too large:
 
-The install output shows:
-```
-! The requested image's platform (linux/amd64) does not match the detected
-  host platform (linux/arm64/v8)
-```
-
-This is a real warning (running an x86 image on Apple Silicon via Rosetta).
-It is harmless — the container starts and runs correctly — but it looks messy
-in the recording. Fix: build and publish an `arm64` image variant.
-
----
-
-## POC results (2026-03-29)
-
-First end-to-end test on this repo confirmed:
-
-- `expect` drives the install successfully — all prompts answered, container starts
-- `asciinema` captures the full session including Claude Code's response
-- `svg-term` renders a working animated SVG with macOS window chrome
-- Full flow captured in plain text: welcome → API key → model → workspace → container pull → SSH → Claude Code → real code output → exit
-
-The recording ran in headless mode (from Claude Code's shell), so timing was
-collapsed to 10 seconds. The pipeline is proven. The remaining work is running
-the recording from a real terminal to get natural timing.
+- Increase `--speed` to reduce duration
+- Use `--idle-time-limit 2` to compress pauses
+- Run through `gifsicle -O3 input.gif -o output.gif` (brew install gifsicle)
 
 ---
 
 ## Applying this to other projects
 
-The same three-tool pipeline works for any project with an interactive terminal
-installer or CLI tool. The only project-specific parts are:
+The same pipeline works for any project with an interactive terminal installer or CLI.
+The only project-specific parts are:
 
-1. **The `expect` prompts** — what text to wait for before sending input
-2. **The demo interaction** — what to type once the tool is running
-3. **The API key / credentials** — handled via env vars, never hard-coded
-
-Template for a new project:
-
-```tcl
-#!/usr/bin/expect -f
-set CHAR_DELAY 80
-
-proc type_slowly {text} {
-    global CHAR_DELAY
-    foreach char [split $text ""] {
-        send -- $char
-        after $CHAR_DELAY
-    }
-}
-
-spawn env TERM=xterm-256color PS1="$ " bash --norc --noprofile
-expect "$ " { after 500 }
-
-# Type your install command
-type_slowly "curl -fsSL https://your-project/install.sh | bash"
-send "\r"
-
-# Wait for your first prompt and respond
-expect "Your first prompt text"
-after 1200
-send "your response\r"
-
-# ... continue for each prompt ...
-
-expect eof
-```
+1. The `wait_for` patterns — what text to wait for before sending input
+2. The demo interaction — what to type once the tool is running
+3. API keys / credentials — pass via env vars, never hardcode
 
 Key principles:
 
-- Always `spawn` with `TERM=xterm-256color` and a simple `PS1` for clean output
-- Use `expect -timeout N` for steps that take variable time (downloads, AI responses)
-- Use `after` for deliberate pauses that make the recording feel human
-- Pass secrets via env vars, never hard-code them in the script
-- Run the final recording from a real terminal, not a non-interactive shell
+- Use `wait_for` (polls `kitty @ get-text`) instead of fixed sleeps — timing varies
+  by network speed and machine
+- Pass secrets via env vars
+- The kitty window must already be open before running the script
+- Run from any terminal that can reach the kitty socket (including Claude Code's shell)

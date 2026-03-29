@@ -9,12 +9,12 @@
 #
 # Tuning constants:
 #   CHAR_DELAY       ms between each typed character  (default 80 — ~12 chars/sec)
-#   WORD_PAUSE       ms pause between words           (default 120)
-#   PROMPT_PAUSE     ms pause before responding       (default 1200)
+#   WORD_PAUSE       ms extra pause after each space  (default 100)
+#   PROMPT_PAUSE     ms pause before responding to a prompt (viewer reads, then sees response)
 
 set CHAR_DELAY   80
-set WORD_PAUSE   120
-set PROMPT_PAUSE 1200
+set WORD_PAUSE   100
+set PROMPT_PAUSE 2000
 set API_KEY      $env(OPENROUTER_KEY)
 set timeout      300
 
@@ -39,55 +39,51 @@ proc pause {ms} {
 }
 
 # ---------------------------------------------------------------------------
-# Start shell with clean prompt and TERM set
+# Start shell — clean prompt, no banner, no clear
+# Recording starts here: viewer sees a prompt and the curl command being typed
 # ---------------------------------------------------------------------------
-spawn env TERM=xterm-256color PS1="\$ " bash --norc --noprofile
+set env(TERM) xterm-256color
+set env(PS1) {$ }
+set env(PROMPT_EOL_MARK) {}
+
+log_user 0
+spawn zsh --no-rcs --no-globalrcs
 expect "\$ "
-pause 500
-send "clear\r"
-expect "\$ "
-pause 800
+log_user 1
+pause 1500
 
 # ---------------------------------------------------------------------------
-# Type the curl install command
+# Type the curl install command — slowly so the viewer can read it
 # ---------------------------------------------------------------------------
 type_slowly "curl -fsSL https://raw.githubusercontent.com/JohnnyFoulds/claude-code-free/main/install.sh | bash"
-pause 600
+pause 1000
 send "\r"
 
 # ---------------------------------------------------------------------------
-# Welcome screen
+# Welcome screen — let the viewer read it, then press Enter
 # ---------------------------------------------------------------------------
 expect "Press Enter to continue"
 pause $PROMPT_PAUSE
 send "\r"
 
 # ---------------------------------------------------------------------------
-# Docker check (already running — no prompt expected, falls through)
-# Step 2: API key
+# API key prompt — pause so viewer sees the prompt, then type
 # ---------------------------------------------------------------------------
 expect "Paste your OpenRouter API key"
 pause $PROMPT_PAUSE
-
-# Type the key — but redact it visually by sending it all at once
-# (the recording will show the key being "typed" but at normal speed it looks fine)
-# To fully redact: replace with a fake key in the recording
-type_slowly "sk-or-v1-xxxx"
-pause 200
-# Send the rest silently then backspace the fake part and send real key
-# Simpler: just type the real key slowly — the SVG shows it, so use a throwaway key
-# OR set API_KEY to a visually plausible fake for the recording
+type_slowly $API_KEY
+pause 800
 send "\r"
 
 # ---------------------------------------------------------------------------
-# Model selection — accept default
+# Model selection — pause, accept default
 # ---------------------------------------------------------------------------
 expect "Model ID"
 pause $PROMPT_PAUSE
 send "\r"
 
 # ---------------------------------------------------------------------------
-# Workspace selection — choose 1
+# Workspace selection — pause, choose 1
 # ---------------------------------------------------------------------------
 expect "Choose \[1/2/3\]"
 pause $PROMPT_PAUSE
@@ -97,34 +93,34 @@ send "1\r"
 # Container pull and start — wait for completion
 # ---------------------------------------------------------------------------
 expect -timeout 180 "Container started"
-pause 1000
+pause 1500
 
 # ---------------------------------------------------------------------------
-# "Try Claude Code right now?"
+# "Try Claude Code right now?" — pause, say yes
 # ---------------------------------------------------------------------------
 expect "Try Claude Code right now"
 pause $PROMPT_PAUSE
 send "y\r"
 
 # ---------------------------------------------------------------------------
-# Wait for SSH + Claude Code to load
+# Wait for SSH connect and Claude Code header to appear
 # ---------------------------------------------------------------------------
 expect -timeout 60 "Claude Code"
 pause 2500
 
 # ---------------------------------------------------------------------------
-# Type the demo prompt slowly
+# Type the demo prompt — slowly, with a long pause before so viewer reads
+# the Claude Code UI first
 # ---------------------------------------------------------------------------
 type_slowly "write a python function that reads a csv file and returns the top 5 rows sorted by a given column"
-pause 300
+pause 800
 send "\r"
 
 # ---------------------------------------------------------------------------
-# Wait for Claude to finish responding
-# The Claude Code prompt is a ">" character on its own line
+# Wait for Claude to finish — prompt returns as "❯ "
 # ---------------------------------------------------------------------------
 expect -timeout 120 -re "\n❯ $"
-pause 2500
+pause 3000
 
 # ---------------------------------------------------------------------------
 # Exit
