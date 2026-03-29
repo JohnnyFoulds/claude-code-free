@@ -15,12 +15,12 @@ You will receive a response within 72 hours. If the issue is confirmed, a fix wi
 
 This project runs an SSH server on `localhost:2223` inside a Docker container. Key points:
 
-- The SSH server is bound to `localhost` only — it is not exposed to your network by default.
+- The SSH server listens on port 2223. By default Docker binds this to `0.0.0.0:2223`, which is reachable by other devices on your local network. If you want to restrict it to localhost only, change the port binding in `~/.claude-code-free/docker-compose.yml` from `"2223:22"` to `"127.0.0.1:2223:22"`.
 - Credentials (OpenRouter API key) are stored in `~/.claude-code-free/.env` on your machine and injected into the container at runtime. They are never transmitted anywhere other than the OpenRouter API.
-- The container runs as a non-root user (`coder`). `sudo` is available inside the container without a password — do not expose the container port beyond localhost.
-- `StrictHostKeyChecking no` is set for `localhost:2223` in your SSH config. This is intentional and scoped to localhost only.
+- The container runs as a non-root user (`coder`), but `sudo` is available without a password. Any code running inside the container — including Claude Code in `bypassPermissions` mode — can escalate to root within the container.
+- `StrictHostKeyChecking no` is set for `localhost:2223` in your SSH config. This is intentional and scoped to that host entry only.
 
 ## What this project does NOT protect against
 
 - A malicious actor with local access to your machine.
-- Exposure of the container SSH port to a network (do not change the port binding to `0.0.0.0`).
+- Other devices on your local network reaching port 2223 unless you restrict the binding to `127.0.0.1` as described above.

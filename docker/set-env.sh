@@ -1,13 +1,13 @@
 #!/bin/sh
 # Claude Code environment — loaded by /etc/profile.d/ for all login shells.
 #
-# Credentials (ANTHROPIC_*) are injected at runtime by Kubernetes via the
-# openrouter-creds secret. This file only sets non-secret defaults and
-# propagates the runtime env vars into login shells (needed because SSH
-# sessions don't inherit the container's process environment directly).
+# SSH sessions do not inherit the container's process environment directly,
+# so ANTHROPIC_* credentials would not be visible to Claude Code when
+# connecting via VS Code Remote SSH.
 #
-# The actual values come from /etc/environment which is written by the
-# entrypoint from the container's env vars.
+# entrypoint.sh writes the runtime ANTHROPIC_* values to /etc/claude-code-env
+# at container start. This script sources that file so every login shell
+# (including VS Code terminals) has the credentials available.
 
 if [ -f /etc/claude-code-env ]; then
     . /etc/claude-code-env
