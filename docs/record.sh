@@ -1,97 +1,90 @@
 #!/usr/bin/env bash
-# record.sh — One-command demo recording for claude-code-free.
+# record.sh — Produce the claude-code-free demo GIF.
 #
 # Usage:
-#   OPENROUTER_KEY=sk-or-v1-your-key bash docs/record.sh
-#
-# What it does:
-#   1. Resets the environment (stops container, removes config, clears known_hosts)
-#   2. Records the full install → SSH → Claude Code session via expect
-#   3. Converts the recording to an animated SVG
-#   4. Opens the SVG in your browser for review
+#   bash docs/record.sh
 #
 # Requirements:
-#   brew install expect asciinema
-#   npm install -g svg-term-cli
+#   brew install vhs
+#   docker/.env.local must contain OPENROUTER_API_KEY
 #
-# Output:
-#   docs/demo.svg   — the animated SVG ready to embed in README.md
+# What it does:
+#   1. Reads the API key from docker/.env.local
+#   2. Resets the environment (stops container, removes config, clears known_hosts)
+#   3. Injects the API key into a temp copy of demo.tape
+#   4. Runs VHS to produce docs/demo.gif
+#   5. Opens the GIF for review
+#
+# To re-record: just run this script again.
+# To change what the demo shows: edit demo.tape, then re-run.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CAST_FILE="/tmp/claude-code-free-demo.cast"
-CAST_V2_FILE="/tmp/claude-code-free-demo-v2.cast"
-SVG_OUT="${SCRIPT_DIR}/demo.svg"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+TAPE_FILE="${SCRIPT_DIR}/demo.tape"
+TEMP_TAPE="/tmp/demo-with-key.tape"
 
 # ---------------------------------------------------------------------------
-# Check requirements
+# Read API key from docker/.env.local
 # ---------------------------------------------------------------------------
-for tool in expect asciinema svg-term; do
-    if ! command -v "$tool" &>/dev/null; then
-        echo "Missing: $tool"
-        echo "Install with:"
-        echo "  brew install expect asciinema"
-        echo "  npm install -g svg-term-cli"
-        exit 1
-    fi
-done
+ENV_LOCAL="${REPO_ROOT}/../docker/.env.local"
+if [[ ! -f "$ENV_LOCAL" ]]; then
+    # Try one level up (when running from within the submodule checkout)
+    ENV_LOCAL="${REPO_ROOT}/docker/.env.local"
+fi
 
-if [[ -z "${OPENROUTER_KEY:-}" ]]; then
-    echo "Error: OPENROUTER_KEY is not set."
-    echo "Usage: OPENROUTER_KEY=sk-or-v1-... bash docs/record.sh"
+OPENROUTER_KEY=$(grep '^OPENROUTER_API_KEY=' "$ENV_LOCAL" 2>/dev/null \
+    | cut -d= -f2- | tr -d "'" | tr -d '"' || true)
+
+if [[ -z "$OPENROUTER_KEY" ]]; then
+    echo "Error: OPENROUTER_API_KEY not found in $ENV_LOCAL"
     exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# Reset to clean state
+# Check requirements
 # ---------------------------------------------------------------------------
-echo "[1/5] Resetting environment..."
+if ! command -v vhs &>/dev/null; then
+    echo "Error: vhs not installed. Run: brew install vhs"
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Reset environment
+# ---------------------------------------------------------------------------
+echo "[1/4] Resetting environment..."
 docker stop claude-code-free 2>/dev/null || true
 docker rm   claude-code-free 2>/dev/null || true
 rm -rf ~/.claude-code-free
 ssh-keygen -R "[localhost]:2223" 2>/dev/null || true
-echo "      Clean."
+echo "      Done."
+
+# ---------------------------------------------------------------------------
+# Inject API key into tape
+# ---------------------------------------------------------------------------
+echo "[2/4] Preparing tape file..."
+sed "s|OPENROUTER_API_KEY_PLACEHOLDER|${OPENROUTER_KEY}|g" \
+    "$TAPE_FILE" > "$TEMP_TAPE"
+echo "      Done."
 
 # ---------------------------------------------------------------------------
 # Record
 # ---------------------------------------------------------------------------
-echo "[2/5] Recording session (this takes 2-4 minutes)..."
-asciinema rec "$CAST_FILE" \
-    --cols 110 \
-    --rows 30 \
-    --overwrite \
-    --command "expect ${SCRIPT_DIR}/record.exp"
-
-echo "      Recorded to $CAST_FILE"
-
-# ---------------------------------------------------------------------------
-# Convert to asciicast v2 (svg-term requires v2)
-# ---------------------------------------------------------------------------
-echo "[3/5] Converting to asciicast v2..."
-asciinema convert -f asciicast-v2 "$CAST_FILE" "$CAST_V2_FILE" --overwrite
-echo "      Converted."
-
-# ---------------------------------------------------------------------------
-# Render SVG
-# ---------------------------------------------------------------------------
-echo "[4/5] Rendering SVG..."
-cat "$CAST_V2_FILE" | svg-term \
-    --out "$SVG_OUT" \
-    --window \
-    --width 110 \
-    --height 30
-
-echo "      Saved to $SVG_OUT ($(du -sh "$SVG_OUT" | cut -f1))"
+echo "[3/4] Recording (this takes 2-4 minutes)..."
+cd "$SCRIPT_DIR"
+vhs "$TEMP_TAPE"
+rm -f "$TEMP_TAPE"
+echo "      Done."
 
 # ---------------------------------------------------------------------------
 # Open for review
 # ---------------------------------------------------------------------------
-echo "[5/5] Opening in browser for review..."
-open "$SVG_OUT"
+echo "[4/4] Opening for review..."
+open -a Safari "${SCRIPT_DIR}/demo.gif"
 
 echo ""
-echo "Done. To add to README.md:"
-echo "  ![claude-code-free demo](docs/demo.svg)"
+echo "Output: docs/demo.gif"
 echo ""
-echo "Then: git add docs/demo.svg README.md && git commit -m 'docs: add animated demo'"
+echo "To publish:"
+echo "  git add docs/demo.gif && git commit -m 'docs: update demo recording'"

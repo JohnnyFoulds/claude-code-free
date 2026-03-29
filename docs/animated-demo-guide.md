@@ -1,7 +1,7 @@
-# Animated Demo Guide — Fully Scripted Terminal Recording
+# Animated Demo Guide
 
 How to produce the README hero animation for claude-code-free, and how to
-apply the same technique to any project.
+apply the same technique to any CLI project.
 
 ---
 
@@ -15,248 +15,226 @@ showing the complete install-to-running flow:
 3. Container starts, SSH connects
 4. Claude Code loads and responds to a coding prompt
 
-No human typing required. One command produces a perfect take every time.
+No human typing required. One command produces a repeatable take every time.
 
 ---
 
-## How it works
+## Pipeline
 
-Four tools form the pipeline:
-
-```
-kitty remote control  →  drives a real TTY terminal (keystrokes sent via unix socket)
-    ↓
-asciinema             →  records every character and its timing inside that terminal
-    ↓
-cast-v3-to-v2.py      →  converts asciinema v3 format to v2 (required by agg)
-    ↓
-agg                   →  renders the cast as an animated GIF
+```text
+demo.tape  →  vhs  →  docs/demo.gif
 ```
 
-### Why kitty remote control
-
-The fundamental problem with every other approach is **headless timing collapse**.
-When `asciinema rec --command "..."` runs without a real TTY, all timing information
-is lost — the entire recording plays back at machine speed regardless of any `sleep`
-or `after` delays in the script. A 3-minute install collapses to 10 seconds.
-
-kitty solves this because:
-
-- asciinema runs inside a real kitty window with a real TTY
-- the recording script sends keystrokes via `kitty @ send-text` from outside
-- all `sleep` delays are honoured — the recording has natural timing
-- no human needs to touch the keyboard
-
-### Why agg instead of svg-term
-
-`svg-term` was the obvious first choice but has two fatal problems:
-
-- It bakes every frame into an inline SVG — runs out of memory (JavaScript heap OOM)
-  on recordings with more than ~1000 events. A real install recording has 8000+ events.
-- It produces blurry text because SVG scales inline text elements rather than rendering
-  at native resolution.
-
-`agg` is asciinema's own Rust-based renderer. It produces proper animated GIFs at
-native resolution with no OOM risk regardless of recording length.
+VHS reads the tape file, drives a virtual terminal internally, and produces
+the GIF. One tool, one file, one command.
 
 ---
 
-## One-time setup
+## Re-recording this demo (claude-code-free specific)
 
-### 1. Install tools
+### Prerequisites (one-time)
 
 ```bash
-brew install asciinema agg
+brew install vhs
 ```
 
-Versions confirmed working on macOS (Apple Silicon):
+`docker/.env.local` must contain `OPENROUTER_API_KEY=sk-or-v1-...`
 
-| Tool | Version |
-| --- | --- |
-| kitty | 0.46.1 |
-| asciinema | 3.2.0 |
-| agg | 1.7.0 |
-
-`kitty` ships with macOS app bundle at `/Applications/kitty.app`. No brew install needed.
-
-**Do not install svg-term-cli** — it is the wrong tool and will OOM on real recordings.
-
-### 2. Enable kitty remote control
-
-Edit `~/.config/kitty/kitty.conf` and add these two lines at the top:
-
-```ini
-allow_remote_control yes
-listen_on unix:/tmp/kitty.sock
-```
-
-**Important:** `listen_on` only takes effect on startup — a config reload (`Ctrl+Shift+F5`)
-does nothing. You must fully quit and restart kitty.
-
-**Important:** kitty appends its PID to the socket path, so the actual socket will be
-`/tmp/kitty.sock-<PID>`, not `/tmp/kitty.sock`. The recording script discovers it
-automatically with `ls /tmp/kitty.sock-*`.
-
-### 3. Verify remote control works
-
-After restarting kitty, run this from any other terminal (including inside Claude Code):
+### Run
 
 ```bash
-SOCK=$(ls /tmp/kitty.sock-* | head -1)
-kitty @ --to "unix:${SOCK}" send-text "echo hello from outside\r"
+bash docs/record.sh
 ```
 
-You should see `echo hello from outside` appear and execute in the kitty window.
+That's it. The script:
 
-If you see `Error: Remote control is disabled` — kitty did not fully restart.
-Use `pkill -x kitty` to force-kill it, then reopen from the Dock or Spotlight.
+1. Reads the API key from `docker/.env.local`
+2. Resets the environment (stops container, removes `~/.claude-code-free`, clears known_hosts)
+3. Runs VHS with the key injected
+4. Opens `docs/demo.gif` in Safari for review
 
-If you see `Error: Failed to connect ... no such file or directory` — the socket path
-is wrong. Run `ls /tmp/kitty.sock-*` to find the actual path.
+### When to re-record
 
----
+- `install.sh` prompts change — update the `Wait` patterns in `demo.tape`
+- Default model changes — update the comment in `demo.tape`
+- Claude Code UI changes — update the `Wait /❯/` pattern if the prompt symbol changes
+- The demo question should be updated — edit the `Type` line near the bottom of `demo.tape`
 
-## Usage
-
-Open kitty. Then from any terminal (including Claude Code's shell):
-
-```bash
-OPENROUTER_KEY=sk-or-v1-your-key bash docs/record-kitty.sh
-```
-
-The script:
-
-1. Finds the kitty socket automatically (`/tmp/kitty.sock-<PID>`)
-2. Stops and removes any existing `claude-code-free` container
-3. Deletes `~/.claude-code-free` (install config)
-4. Clears the `[localhost]:2223` known_hosts entry
-5. Sets a clean `$` prompt and clears the screen inside kitty
-6. Starts `asciinema rec` inside the kitty window
-7. Types the curl command, responds to every prompt, types the demo question
-8. Waits for Claude's response, then exits cleanly
-9. Converts the cast from asciinema v3 to v2 format
-10. Renders `docs/demo.gif` with `agg`
-11. Opens the GIF for review
-
----
-
-## Files
+### Files
 
 | File | Purpose |
 | --- | --- |
-| `record-kitty.sh` | Main script — does everything from reset to rendered GIF |
-| `cast-v3-to-v2.py` | Converts asciinema v3 cast to v2 format |
-| `demo-reset.sh` | Standalone reset — clean docker + clean shell, for manual recording |
-| `record.exp` | Legacy expect script (kept for reference — headless timing problem applies) |
-| `record.sh` | Legacy shell wrapper for expect (kept for reference) |
-| `demo.gif` | Output — the animated GIF for the README |
+| `demo.tape` | The storyboard and automation script — edit this to change the demo |
+| `record.sh` | Wrapper: resets env, injects API key, runs VHS, opens output |
+| `demo.gif` | Output — committed to the repo, embedded in README |
 
 ---
 
-## Tuning
+## How demo.tape works
 
-All timing is controlled by env vars:
+`demo.tape` is a VHS tape file. Every line is either a setting or an action.
+The comments explain every beat — it reads like a storyboard.
 
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `CHAR_DELAY_MS` | 80 | Milliseconds between each typed character |
-| `WORD_PAUSE_MS` | 120 | Extra milliseconds after each space |
-| `PROMPT_PAUSE_MS` | 2000 | Pause before responding to a prompt |
+Key commands used:
 
-```bash
-OPENROUTER_KEY=sk-or-v1-... CHAR_DELAY_MS=50 PROMPT_PAUSE_MS=1500 bash docs/record-kitty.sh
-```
-
-agg rendering options (edit the `agg` call in `record-kitty.sh`):
-
-| Flag | Effect |
+| Command | What it does |
 | --- | --- |
-| `--speed 1.5` | Play back 50% faster |
-| `--idle-time-limit 3` | Cap any gap between events at 3s (default) — prevents long pauses |
-| `--font-size 14` | Font size in the output GIF |
+| `Type "text"` | Types text at `TypingSpeed` ms per character |
+| `Enter` | Presses Enter |
+| `Wait /regex/` | Waits for matching text to appear on screen before continuing |
+| `Sleep Ns` | Pauses for N seconds (used for dramatic effect after prompts) |
+| `Set TypingSpeed Xms` | How fast characters are typed |
+| `Set WaitTimeout Xs` | How long to wait before a `Wait` times out |
+| `Set Theme "name"` | Terminal colour theme |
+| `Set WindowBar Colorful` | macOS-style traffic light window chrome |
 
----
+### The Wait + Sleep pattern
 
-## The API key problem
+Every prompt follows this pattern:
 
-The script types the OpenRouter API key character by character. The real key will
-appear in the GIF — visible to anyone who views it on GitHub.
-
-Options:
-
-1. **Use a throwaway key** — create a free OpenRouter key just for the recording,
-   revoke it afterwards. The GIF shows a real-looking key that no longer works.
-
-2. **Speed through the key** — set `CHAR_DELAY_MS=5` so it types too fast to read.
-   The rest of the demo runs at normal speed.
-
----
-
-## Known issues and hard-won lessons
-
-### `listen_on` requires a full restart
-
-`kitty --reload-config` and `Ctrl+Shift+F5` do **not** apply `listen_on` changes.
-The socket is only created when the kitty process starts. You must `pkill -x kitty`
-and reopen the app.
-
-### Socket has PID suffix
-
-The configured path `unix:/tmp/kitty.sock` becomes `unix:/tmp/kitty.sock-<PID>` at
-runtime. This is by design (allows multiple kitty instances). The recording script
-handles this automatically — do not hardcode the socket path.
-
-### svg-term OOM
-
-`svg-term-cli` is not suitable for recordings longer than ~30 seconds. It will crash
-with `FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory`
-on any real install recording. Use `agg`.
-
-### asciinema v3 vs v2
-
-asciinema 3.x records in v3 format where event timestamps are **relative** (offset
-from previous event). Both `agg` and `svg-term` require v2 format where timestamps
-are **absolute** (seconds since start). Always run `cast-v3-to-v2.py` before rendering.
-
-### Fancy zsh prompt in the recording
-
-If your zsh uses Powerlevel10k or oh-my-zsh with Nerd Font glyphs, those glyphs render
-as broken boxes in the output GIF because the renderer does not have the font. The
-recording script works around this by switching to a clean bash shell before starting
-asciinema:
-
-```bash
-exec env -i HOME="$HOME" TERM=xterm-256color PATH="$PATH" bash --norc --noprofile
-PS1='$ '
+```text
+Wait /prompt text/    # wait for it to actually appear on screen
+Sleep 1s              # deliberate pause so viewer can read it
+Type "response"       # respond
+Enter
 ```
 
-This replaces the current shell with a clean bash that has no rc files, no conda prefix,
-no Powerlevel10k, and no fancy prompt — just `$`.
+`Wait` is what makes the script robust — it never moves on until the prompt
+is actually visible. `Sleep` after `Wait` is purely for the viewer's benefit.
+Never use `Sleep` as a substitute for `Wait`.
 
-### GIF file size
+### The Claude response problem
 
-`agg` GIFs can be 5–20 MB for a 3-minute recording. GitHub supports animated GIFs
-up to 25 MB in READMEs. If the file is too large:
+`Wait+Screen /❯/` (wait for screen change + prompt) does not work reliably
+when the session involves SSH into a container — VHS's internal shell exits
+when the SSH session ends and restarts, losing context. Use `Sleep` instead:
 
-- Increase `--speed` to reduce duration
-- Use `--idle-time-limit 2` to compress pauses
-- Run through `gifsicle -O3 input.gif -o output.gif` (brew install gifsicle)
+```text
+Sleep 35s    # Step-3.5-Flash typically responds in 20-30s on free tier
+```
+
+Adjust this value if the response gets cut off or the GIF ends too early.
 
 ---
 
 ## Applying this to other projects
 
-The same pipeline works for any project with an interactive terminal installer or CLI.
-The only project-specific parts are:
+The same pipeline works for any project with an interactive terminal installer
+or CLI tool. The only project-specific parts are:
 
-1. The `wait_for` patterns — what text to wait for before sending input
+1. The `Wait` patterns — what text to wait for before sending input
 2. The demo interaction — what to type once the tool is running
-3. API keys / credentials — pass via env vars, never hardcode
+3. API keys / credentials — injected at run time, never in the tape file
 
-Key principles:
+### Template tape file
 
-- Use `wait_for` (polls `kitty @ get-text`) instead of fixed sleeps — timing varies
-  by network speed and machine
-- Pass secrets via env vars
-- The kitty window must already be open before running the script
-- Run from any terminal that can reach the kitty socket (including Claude Code's shell)
+```text
+# demo.tape — <your project> README hero animation
+# Edit this to change the demo. Run: bash docs/record.sh
+
+Output docs/demo.gif
+
+Set Shell bash
+Set WindowBar Colorful
+Set Width 1200
+Set Height 600
+Set FontSize 22
+Set Theme "Dracula"
+Set TypingSpeed 50ms
+Set WaitTimeout 120s
+
+# === Install ===
+Type "curl -fsSL https://your-project/install.sh | bash"
+Enter
+
+Wait /your first prompt/
+Sleep 1s
+Type "your response"
+Enter
+
+# Add one Wait + Sleep + Type block per prompt
+
+# === Demo ===
+Wait /ready prompt/
+Sleep 2s
+Type "your demo command"
+Enter
+
+Sleep 10s    # adjust to match how long your tool takes to respond
+
+Type "exit"
+Enter
+Sleep 1s
+```
+
+### Template record.sh
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Read credentials from .env.local (never hardcode in tape file)
+API_KEY=$(grep '^YOUR_API_KEY=' "${SCRIPT_DIR}/../.env.local" | cut -d= -f2-)
+
+# Reset environment
+# (add project-specific reset commands here)
+
+# Inject credentials and run
+sed "s|API_KEY_PLACEHOLDER|${API_KEY}|g" "${SCRIPT_DIR}/demo.tape" \
+    > /tmp/demo-with-key.tape
+vhs /tmp/demo-with-key.tape
+rm /tmp/demo-with-key.tape
+
+open -a Safari "${SCRIPT_DIR}/demo.gif"
+```
+
+### Key principles
+
+- `Wait /regex/` instead of `Sleep` for synchronisation — robust, not timing-based
+- `Sleep` only for deliberate viewer pauses after prompts
+- Credentials injected via `sed` at run time — never stored in the tape file
+- The tape file IS the storyboard — comments explain every beat
+- `Set WaitTimeout` must be long enough for slow operations (docker pull, AI responses)
+- `Set WindowBar Colorful` + `Set Theme "Dracula"` is the production-quality baseline
+
+### Production style settings (from literature review)
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| `Set Width` | 1200 | GitHub renders READMEs at ~800px; 1200 is crisp at that size |
+| `Set Height` | 600 | Fits most install flows without too much empty space |
+| `Set FontSize` | 22 | Readable at display size |
+| `Set Theme` | Dracula | High contrast, widely recognised, looks professional |
+| `Set WindowBar` | Colorful | Immediately signals "this is a terminal" to viewers |
+| `Set TypingSpeed` | 50ms | Confident typist; not so fast it looks automated |
+
+---
+
+## Known issues and hard-won lessons
+
+### Wait+Screen does not work with SSH sessions
+
+`Wait+Screen /regex/` waits for the screen content to change and then match.
+It fails when the session involves SSHing into a container: VHS's internal
+shell exits when the SSH session ends and VHS restarts it, losing all context.
+Use `Sleep` with a generous timeout for steps that involve SSH.
+
+### VHS output path cannot start with /tmp/
+
+VHS parses the `Output` path and treats `/` as a command separator.
+Use relative paths: `Output docs/demo.gif`, not `Output /tmp/demo.gif`.
+
+### Set PlaybackSpeed is not a mid-tape command
+
+`Set PlaybackSpeed` can only be set once at the top of the tape — it applies
+to the entire recording. It cannot be used to speed up a specific section
+(e.g. a docker pull). For per-section speed control, use the dual-recording
+approach: record with asciinema, post-process the `.cast` timestamps, render
+with `agg`. See `docs/demo-recording-best-practices.md` for details.
+
+### Exec is not a valid VHS command
+
+Environment reset (stopping containers, clearing config) must happen in the
+`record.sh` wrapper before VHS runs — not inside the tape file.
