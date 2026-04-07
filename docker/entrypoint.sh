@@ -10,12 +10,18 @@ fi
 # This makes them available in SSH login shells (VS Code Remote SSH terminals),
 # which don't inherit the container process environment directly.
 {
-    for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_MODEL; do
+    for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_MODEL CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS; do
         val=$(printenv "$var" 2>/dev/null || true)
         if [ -n "$val" ]; then
             echo "export ${var}=\"${val}\""
         fi
     done
+    # Claude Code 2.1+ sends context-management-2025-06-27 beta for any non-claude-3 model
+    # on firstParty provider (which includes ANTHROPIC_BASE_URL pointing at OpenRouter).
+    # OpenRouter rejects this with HTTP 400. Force the flag on unless explicitly set to 0.
+    if [ -z "$(printenv CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS 2>/dev/null)" ]; then
+        echo "export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=\"1\""
+    fi
 } > /etc/claude-code-env
 chmod 640 /etc/claude-code-env
 chown root:coder /etc/claude-code-env
